@@ -1,0 +1,19 @@
+0.0039 0.5 0.2
+thershold 0.36
+edge error 0.01
+PLUS fixed 7
+TIGHT 1.000001
+FINAL 0
+MONTE YES
+Global_Times 90
+Global_Th 30
+PVRange 0.025
+R_Threshold 60
+R_RunTime 100
+L_Threshold 60
+L_RunTime 100
+Ref_Times 100
+Ref_Threshold 65
+Qual_Threshold 65
+Qual_Times 100
+Q_Monte Close
