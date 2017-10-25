@@ -1,18 +1,17 @@
 #----------- DECLARATION ---------------------------
-CC 			= g++
-RM 			= rm -f
-Flag_1 		= -w -g -o3
-Flag_2 		= -w -g 
-Flag_3 		= -w -o
-Version 	= -std=c++11 -pthread
-OBJDIR 		= obj
-BINDIR      = bin
-SRCDIR		= src
-
-SRC			:= $(wildcard $(SRCDIR)/*.cpp)
-INC			:= $(wildcard $(SRCDIR)/*.h)
-OBJ			:= $(SRC:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
-EXE			:= research
+CC	= g++
+RM	= rm -f
+Flag_1	= -w -g -o3
+Flag_2	= -w -g 
+Flag_3	= -w -o
+Version	= -std=c++11 -pthread
+OBJDIR	= obj
+BINDIR	= bin
+SRCDIR	= src
+SRC	:= $(wildcard $(SRCDIR)/*.cpp)
+INC	:= $(wildcard $(SRCDIR)/*.h)
+OBJ	:= $(SRC:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
+EXE	:= research
 
 #------------ COMPILE -------------------------------
 all: $(OBJ)
