@@ -1,4 +1,4 @@
-#Declare variables:
+#----------- DECLARATION ---------------------------
 CC 			= g++
 RM 			= rm -f
 Flag_1 		= -w -g -o3
@@ -14,15 +14,15 @@ INC			:= $(wildcard $(SRCDIR)/*.h)
 OBJ			:= $(SRC:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 EXE			:= research
 
-
-#The first target ex:all will be the final target
-#Makefile below:
-
+#------------ COMPILE -------------------------------
 all: $(OBJ)
-	$(CC) $(Version) $(Flag_3) $(EXE) $^
+	@$(CC) $(Version) $(Flag_3) $(EXE) $^
+	@echo "Finish Linking"
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp $(INC)
-	$(CC) $(Version) -c $< -o $@
+	@$(CC) $(Version) -c $< -o $@
+	@echo "Compiled "$<" successfully!"
 
+#------------- CMD ----------------------------------
 .PHONY:clean
 clean:
 	$(RM) research $(OBJDIR)/*.o
