@@ -405,15 +405,15 @@ bool compare( struct PVdata* A, struct PVdata*B ){  return ( A->gdist() < B->gdi
 
 void PV_Monte_Simulation( int PVtimes , double year , vector< struct PVdata* > &_vPV, double bu, double bl  )
 {
-    FILE *fupper100 = fopen("./Quality/Q_upper100.txt","w+t") ;
-    FILE *flower100 = fopen("./Quality/Q_lower100.txt","w+t") ;
-    FILE *fdistn100 = fopen("./Quality/Q_distn100.txt","w+t") ;
-    FILE *fupper95  = fopen("./Quality/Q_upper95.txt" ,"w+t") ;
-    FILE *flower95  = fopen("./Quality/Q_lower95.txt" ,"w+t") ;
-    FILE *fdistn95  = fopen("./Quality/Q_distn95.txt" ,"w+t") ;
-    FILE *fupper05  = fopen("./Quality/Q_upper05.txt" ,"w+t") ;
-    FILE *flower05  = fopen("./Quality/Q_lower05.txt" ,"w+t") ;
-    FILE *fdistn05  = fopen("./Quality/Q_distn05.txt" ,"w+t") ;
+    FILE *fupper100 = fopen("./quality/Q_upper100.txt","w+t") ;
+    FILE *flower100 = fopen("./quality/Q_lower100.txt","w+t") ;
+    FILE *fdistn100 = fopen("./quality/Q_distn100.txt","w+t") ;
+    FILE *fupper95  = fopen("./quality/Q_upper95.txt" ,"w+t") ;
+    FILE *flower95  = fopen("./quality/Q_lower95.txt" ,"w+t") ;
+    FILE *fdistn95  = fopen("./quality/Q_distn95.txt" ,"w+t") ;
+    FILE *fupper05  = fopen("./quality/Q_upper05.txt" ,"w+t") ;
+    FILE *flower05  = fopen("./quality/Q_lower05.txt" ,"w+t") ;
+    FILE *fdistn05  = fopen("./quality/Q_distn05.txt" ,"w+t") ;
     int R1,R2,R3,R4,R5,R6 ;
     R1 = R2 = R3 = R4 = R5 = R6 = 0;
     //-----------------------------------------------------------------------------------
@@ -841,8 +841,8 @@ void PV_show()
     int cands = info[1]+info[2]+info[3]-info[4]     ;
     double PDP_thre = 5 ;
     //-----------------------------------------------------------------------------
-    FILE *fout  = fopen( "./Analysis/PDP.txt" ,"w+t")    ;
-    FILE *fout2 = fopen( "./Analysis/Path.txt","w+t")    ;
+    FILE *fout  = fopen( "./analysis/PDP.txt" ,"w+t")    ;
+    FILE *fout2 = fopen( "./analysis/Path.txt","w+t")    ;
     fprintf( fout2, CYAN "\n------------PV Path Investigation----------------\n" ) ;
    //-----------------------------------------------------------------------------
     for( auto pptr : PathR )

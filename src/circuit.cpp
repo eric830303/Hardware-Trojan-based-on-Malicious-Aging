@@ -2132,9 +2132,9 @@ int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
     
     //--------------------- Call Minisat ----------------------------------------
     if( flag == 1 )
-        system("./minisat ./CNF/best.cnf ./CNF/temp.sat 1> ./SAT_Report/minisat_std_output.txt 2> ./SAT_Report/minisat_warn_output.txt ");
+        system("./minisat ./CNF/best.cnf ./CNF/temp.sat 1> ./sat_report/minisat_std_output.txt 2> ./sat_report/minisat_warn_output.txt ");
     else
-        system("./minisat ./CNF/sat.cnf ./CNF/temp.sat 1> ./SAT_Report/minisat_std_output.txt 2> ./SAT_Report/minisat_warn_output.txt ");
+        system("./minisat ./CNF/sat.cnf ./CNF/temp.sat 1> ./sat_report/minisat_std_output.txt 2> ./sat_report/minisat_warn_output.txt ");
     
     fstream file;
     file.open( "./CNF/temp.sat", ios::in );//temp.sat是minisat執行完的結果
