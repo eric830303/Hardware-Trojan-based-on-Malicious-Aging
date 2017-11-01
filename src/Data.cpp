@@ -66,26 +66,26 @@ bool BInv(double &bu, double &bl, double u1, double l1, double u2, double l2,dou
         {
             if (dc1<dc2)
             {
-                bu = u1, bl = l1, dcb = dc1;
+                bu = u1 ; bl = l1 ; dcb = dc1;
                 return false;
             }
-            bu = u2, bl = l2, dcb = dc2;
+            bu = u2; bl = l2; dcb = dc2;
             return true;
         }
         else if (minf(absf(u1 - n), absf(l1 - n)) < minf(absf(u2 - n), absf(l2 - n)))
         {
-            bu = u1, bl = l1, dcb = dc1;
+            bu = u1; bl = l1; dcb = dc1;
             return false;
         }
-        bu = u2, bl = l2, dcb = dc2;
+        bu = u2; bl = l2; dcb = dc2;
         return true;
     }
     else if (maxf(absf(u1 - n), absf(l1 - n)) < maxf(absf(u2 - n), absf(l2 - n)))
     {
-        bu = u1, bl = l1, dcb = dc1;
+        bu = u1; bl = l1; dcb = dc1;
         return false;
     }
-    bu = u2, bl = l2, dcb = dc2;
+    bu = u2; bl = l2; dcb = dc2;
     return true;
 }
 
@@ -397,6 +397,24 @@ void DefCandMineSafe( double year,double margin,bool flag,double PLUS )//CheckPa
     return;
 }
 
+void Region( double &year_lower, double &year_upper, double &L, double &R )
+{
+    static int R1 = 0, R2 = 0, R3 = 0, R4 = 0, R5 = 0, R6 = 0 ;
+    
+    if( year_lower < L )
+    {
+        if( year_upper < L )        R1++ ;
+        else if( year_upper < R )   R2++ ;
+        else                        R3++ ;
+    }
+    else if( year_lower < R )
+    {
+        if(  year_upper < R )       R6++ ;
+        else                        R4++ ;
+    }
+    else                            R5++ ;
+    printf( "R1 = %d, R2 = %d, R3 = %d, R4 = %d, R5 = %d, R6 = %d\n\n", R1, R2, R3, R4, R5, R6) ;
+}
 ////////////////////////////////////////////////////////////////////////////////////
 //              PV Simulator                                                      //
 ////////////////////////////////////////////////////////////////////////////////////
@@ -407,27 +425,16 @@ void PV_Monte_Simulation( int PVtimes , double year , vector< struct PVdata* > &
 {
     FILE *fupper100 = fopen("./quality/Q_upper100.txt","w+t") ;
     FILE *flower100 = fopen("./quality/Q_lower100.txt","w+t") ;
-    FILE *fdistn100 = fopen("./quality/Q_distn100.txt","w+t") ;
-    FILE *fupper95  = fopen("./quality/Q_upper95.txt" ,"w+t") ;
-    FILE *flower95  = fopen("./quality/Q_lower95.txt" ,"w+t") ;
-    FILE *fdistn95  = fopen("./quality/Q_distn95.txt" ,"w+t") ;
-    FILE *fupper05  = fopen("./quality/Q_upper05.txt" ,"w+t") ;
-    FILE *flower05  = fopen("./quality/Q_lower05.txt" ,"w+t") ;
-    FILE *fdistn05  = fopen("./quality/Q_distn05.txt" ,"w+t") ;
-    int R1,R2,R3,R4,R5,R6 ;
-    R1 = R2 = R3 = R4 = R5 = R6 = 0;
+    
+    double PV_monteU = 0, PV_monteL = 0 ;
+    double L = year-ERROR, R = year+ERROR ;
+
     //-----------------------------------------------------------------------------------
     for( int i = 0 ; i < PVtimes ; i++ )
     {
+        PV_monteU = PV_monteL = 0.0              ;
         printf( YELLOW "[ %d th Instance Simulation ]\n" RESET , i )   ;
-        double PV_monteU = 0.0 , PV_monteL = 0.0              ;
         Monte_PVCalQuality( year, PV_monteU, PV_monteL )      ;
-        struct PVdata *ptrData = new struct PVdata( PV_monteU, PV_monteL )  ;
-        ptrData->sdist( sqrt( pow( PV_monteU-bu,2 ) + pow ( PV_monteL-bl, 2 ) ) ) ;
-        _vPV.push_back( ptrData )                        ;
-        fprintf( fupper100, "%f\n", PV_monteU )          ;
-        fprintf( flower100, "%f\n", PV_monteL )          ;
-        fprintf( fdistn100, "%f\n", ptrData->gdist() )   ;
         printf( "Q(PV) : ") ;
         if( PV_monteU < year - ERROR ) printf( RED )  ;
         else                           printf( RESET );
@@ -436,42 +443,10 @@ void PV_Monte_Simulation( int PVtimes , double year , vector< struct PVdata* > &
         else                           printf( RESET );
         printf("%f\n", PV_monteL );
         printf( RESET );
+        Region( PV_monteU, PV_monteL, L, R ) ;
+        fprintf( fupper100, "%f\n", PV_monteU )          ;
+        fprintf( flower100, "%f\n", PV_monteL )          ;
     }
-    //-----------------------------------------------------------------------------------
-    sort( _vPV.begin(), _vPV.end() , compare )           ;
-    //-----------------------------------------------------------------------------------
-    double j  = 0 , th = ((double)PVtimes)*(0.95)        ;
-    for( ; j < th ; j++ )
-    {
-        double year_lower = _vPV[(int)j]->gupper() ;
-        double year_upper = _vPV[(int)j]->glower() ;
-        double L = year - ERROR ;
-        double R = year + ERROR ;
-        fprintf( fupper95,"%f\n", year_upper );
-        fprintf( flower95,"%f\n", year_lower );
-        fprintf( fdistn95,"%f\n",_vPV[(int)j]->gdist()  );
-        
-        if( year_lower < L )
-        {
-            if( year_upper < L )        R1++ ;
-            else if( year_upper < R )   R2++ ;
-            else                        R3++ ;
-        }
-        else if( year_lower < R )
-        {
-            if(  year_upper < R )       R6++ ;
-            else                        R4++ ;
-        }
-        else                            R5++ ;
-    }
-    //-----------------------------------------------------------------------------------
-    for( ; j < PVtimes ; j++ )
-    {
-        fprintf( fupper05,"%f\n",_vPV[(int)j]->gupper() );
-        fprintf( flower05,"%f\n",_vPV[(int)j]->glower() );
-        fprintf( fdistn05,"%f\n",_vPV[(int)j]->gdist()  );
-    }
-    printf( "R1 = %d, R2 = %d, R3 = %d, R4 = %d, R5 = %d, R6 = %d\n", R1, R2, R3, R4, R5, R6) ;
 }
 ////////////////////////////////////////////////////////////////////////////////////
 //              PV Simulator - Instance Generator                                 //
@@ -480,9 +455,11 @@ void GeneratePVCkt()
 {
     for( int i = 0 ; i < PathR.size() ; i++ )
     {
+        /*
         PathR[i].SetPVMine(false) ;
         PathR[i].SetPVCand(false) ;
         PathR[i].SetPVSafe(true)  ;
+         */
         for( int j = 1 ; j < PathR[i].gTiming()->size() ; j++ )
         {
             double U = rand() / (double)RAND_MAX                    ;
@@ -497,7 +474,7 @@ void GeneratePVCkt()
 ////////////////////////////////////////////////////////////////////////////////////
 double Monte_PVCalQuality(double year, double &up, double &low)
 {
-    up = 10.0, low = 0.0            ;
+    up = 10.0; low = 0.0            ;
     int TryT = 3000 / PathC.size()  ;
     if( TryT < 30 ) TryT = 30       ;
     map< double , worse* > worse    ;
@@ -581,7 +558,7 @@ double Monte_PVCalQuality(double year, double &up, double &low)
     sort( monte.begin(), monte.end() )  ;
     int front = 0                       ;
     int back = (int)monte.size() - 1    ;
-    up = monte[front], low = monte[back];
+    up = monte[front]; low = monte[back];
     
     //#------------ Remove Remotest 5% Dots --------------------------------------------
     while( front + monte.size() - 1 - back <= monte.size()/20 )

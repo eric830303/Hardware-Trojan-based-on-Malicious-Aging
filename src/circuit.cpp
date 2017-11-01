@@ -725,13 +725,15 @@ bool Vio_Check( PATH* pptr, int stn, int edn, AGT ast, AGT aed, double year, int
         {
             double Vth_pv    = 0 ;
             double AgRate    = 0 ;
-            double GateDelay = 0 ;
+            double Gate_DN_Delay = 0 ;//Design
+            double Gate_PV_Delay = 0 ;//PV
             for( int i = 0 ; i < pptr->length()-1 ; i++ )
             {
-                GateDelay = ( pptr->Out_time(i) - pptr->In_time(i) ) ;
-                Vth_pv = pptr->gTiming(i)->pv() ;
-                AgRate = CalAgingRateWithVthPV( Vth_pv, year );
-                DelayP += GateDelay*AgRate ;
+                Gate_DN_Delay = ( pptr->Out_time(i) - pptr->In_time(i) ) ;//Design delay
+                Vth_pv = pptr->gTiming(i)->pv()                 ;
+                Gate_PV_Delay = Gate_DN_Delay*( Vth_pv*2 )      ;
+                AgRate = CalAgingRateWithVthPV( Vth_pv, year )  ;
+                DelayP += ( Gate_DN_Delay + Gate_PV_Delay )*AgRate ;
             }
         }
         //##------------------ Set/Hold Timing Constraint -----------------------------------------
@@ -903,13 +905,15 @@ bool Vio_Check( PATH* pptr, long double year, double Aging_P , int mode, int thr
         {
             double Vth_pv    = 0 ;
             double AgRate    = 0 ;
-            double GateDelay = 0 ;
+            double Gate_DN_Delay = 0 ;//Design
+            double Gate_PV_Delay = 0 ;//PV
             for( int i = 0 ; i < pptr->length()-1 ; i++ )
             {
-                GateDelay = ( pptr->Out_time(i) - pptr->In_time(i) ) ;
-                Vth_pv = pptr->gTiming(i)->pv() ;
-                AgRate = CalAgingRateWithVthPV( Vth_pv, year );
-                DelayP += GateDelay*AgRate ;
+                Gate_DN_Delay = ( pptr->Out_time(i) - pptr->In_time(i) ) ;//Design delay
+                Vth_pv = pptr->gTiming(i)->pv()                 ;
+                Gate_PV_Delay = Gate_DN_Delay*( Vth_pv*2 )      ;
+                AgRate = CalAgingRateWithVthPV( Vth_pv, year )  ;
+                DelayP += ( Gate_DN_Delay + Gate_PV_Delay )*AgRate ;
             }
         }
         //----------------- DelayP using different Aging Model -----------------------------------------
@@ -1697,7 +1701,7 @@ void CheckPathAttackbility(double year,double margin,bool flag,double PLUS)
             printf("PDP = %d, _mapsize = %ld \n" RESET , PathC[i]->pldcc, PathC[i]->_mapdcc.size() ) ;
         }
         printf("PI:%d PO:%d C:%d M:%d \n",aa,bb,aa+bb+cc-dd,dd );
-        info[1] = aa, info[2] = bb, info[3] = cc, info[4] = dd;
+        info[1] = aa; info[2] = bb; info[3] = cc; info[4] = dd;
     }
     printf("Finishing Checking\n");
     return;
@@ -2210,7 +2214,7 @@ void CheckOriLifeTime()
             }
             if( mid < e_upper )
                 e_upper = mid;				//最早的點(因為發生錯誤最早在此時)
-            st = 1.0, ed = 50.0;
+            st = 1.0; ed = 50.0;
             while( ed - st > 0.0001 )
             {
                 mid = (st + ed) / 2;

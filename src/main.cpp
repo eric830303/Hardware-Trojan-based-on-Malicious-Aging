@@ -225,7 +225,7 @@ int main( int argc, char* argv[] )
         return 0 ;
     }
     
-    bestup = 100, bestlow = -100, bestdcc = 10000;
+    bestup = 100; bestlow = -100; bestdcc = 10000;
     
     //------------- Final Refine -----------------------------------------------------------------
     printf("Final Refinement based on the preceding best solution.\n" )             ;
