@@ -20,11 +20,14 @@ class CIRCUIT   ;
 inline double maxf(double a, double b) ;
 inline double minf(double a, double b) ;
 bool    BInv(double&,double&,double,double,double,double,double,int&,int,int )      ;
-void    ReadParameter( double &,double&,int&,bool&monte_s,int,int&,int&,double&)    ;
+void    ReadParameter( int ,char*[])    ;
+void    printSetting( )                 ;
 void    release( HASHTABLE *)                                                       ;
 void    PV_show()                                                                   ;
-void    PV_Monte_Simulation( int,double,vector< PVdata* > &,double,double)          ;
-
+void    PV_Monte_Simulation( double, double )          ;
+void    ReverseSol(  )    ;
+void    RemoveAdditionalDCC( bool * ) ;
+void    AddNode( ) ;
 
 //////////////////////////////////////////////////////////////////
 //          Varaible Declaration                                //
@@ -98,6 +101,24 @@ struct dccinfo
     void pv_pref( bool pv_pref ){ if( !(this->prefail) && ( pv_pref ) ){ this->pv_prefail++ ; } }
     void pv_posf( bool pv_posf ){ if( !(this->posfail) && ( pv_posf ) ){ this->pv_posfail++ ; } }
     void pv_midd( bool pv_midd ){ if( !(this->middle ) && ( pv_midd ) ){ this->pv_middle++  ; } }
+};
+
+struct info
+{
+    int bestdcc ;
+    int dccs ;
+    int oridccs  ;
+    double bestup ;
+    double bestlow;
+    double upper, lower ;
+    info()
+    {
+        bestup   = 100   ;
+        bestlow  = -100  ;
+        bestdcc  = 10000 ;
+        dccs     = 0     ;
+        oridccs  = 0    ;
+    }
 };
 
 

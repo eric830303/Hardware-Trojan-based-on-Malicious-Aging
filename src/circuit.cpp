@@ -27,6 +27,7 @@ extern double ERROR     ;
 extern double PVRange   ;
 extern double PLUS      ;
 extern double tight     ;
+extern double year      ;
 //////////////////////////////////////////////////////////////////
 extern int TotalTimes   ;
 extern int Threshold    ;
@@ -44,12 +45,8 @@ extern map< double, double>pvtoSv  ;
 //////////////////////////////////////////////////////////////////
 extern string fname     ;
 //////////////////////////////////////////////////////////////////
-double period           ;
+extern double period    ;
 double _pvPeriod        ;
-double **_pEdgeA        ;
-double **_pEdgeB        ;
-double **_pcor          ;
-double **_pser          ;
 
 vector< GATE* > _vDCCGate ;
 //////////////////////////////////////////////////////////////////
@@ -94,9 +91,10 @@ void CIRCUIT::PutClockSource()
 //////////////////////////////////////////////////////////////////
 void ReadCircuit( string filename )
 {
-    printf("Reading Circuit...\n");
+    string vgname = "./benchmark/" + filename + ".vg"  ;
+    printf( CYAN"[Info] Reading Circuit...\n");
     fstream file;
-    file.open(filename.c_str(),ios::in);
+    file.open(vgname.c_str(),ios::in);
     char temp[1000]     ;
     bool cmt = false    ;
     int Nowmodule = -1  ;
@@ -200,7 +198,7 @@ void ReadCircuit( string filename )
         }
     }
     file.close();
-    printf("Finish Reading Circuit\n");
+    printf( CYAN"[Info] Finish Reading Circuit\n");
     return;
 }
 //////////////////////////////////////////////////////////////////
@@ -208,7 +206,8 @@ void ReadCircuit( string filename )
 //////////////////////////////////////////////////////////////////
 void ReadPath_l( string filename )
 {
-    printf("Reading Cirtical Paths Information...\n") ;
+    string rptname = "./benchmark/" + filename + ".rpt"  ;
+    printf( CYAN"[Info] Reading Cirtical Paths Information...\n") ;
     fstream file     ;
     string line      ;
     string sp        ;
@@ -216,7 +215,7 @@ void ReadPath_l( string filename )
     GATE*   gptr = NULL, *spptr = NULL, *epptr = NULL;
     PATH*   p = NULL;
     unsigned Path_No = 0;
-    file.open( filename.c_str(), ios::in);
+    file.open( rptname.c_str(), ios::in);
     while( getline(file, line) )
     {
         if( line.find("Startpoint") != string::npos )
@@ -356,53 +355,36 @@ void ReadPath_l( string filename )
         sp = "";
     }
     file.close();
-    printf( "finished Reading rptfile .\n") ;
 }
 
-void ReadCpInfo( string filename , int mod )//讀關聯性和迴歸線
+void ReadCpInfo( string filename  )//讀關聯性和迴歸線
 {
     fstream file ;
-    file.open( filename.c_str()) ;
+    string cpname = "./benchmark/" +filename + ".cp" ;
+    file.open( cpname.c_str()) ;
+    if( !file )
+    {
+        printf(" Can't Open *.cp file\n");
+    }
     map< unsigned, unsigned > mapping ;	//原編號(沒有去掉PI->PO & NO_GATE的) -> PathC的編號
-    unsigned long ss = ( mod == 1 )?(PathC.size()):(_vPathC.size()) ;
+    unsigned long ss = PathC.size() ;
     
-    if( mod ==  1 )
+    EdgeA = new double  *[ss]   ;
+    EdgeB = new double  *[ss]   ;
+    cor = new double    *[ss]   ;
+    ser = new double    *[ss]   ;
+    for( int i = 0 ; i < ss ; i++ )
     {
-        EdgeA = new double  *[ss]   ;
-        EdgeB = new double  *[ss]   ;
-        cor = new double    *[ss]   ;
-        ser = new double    *[ss]   ;
-        for( int i = 0 ; i < ss ; i++ )
-        {
-            EdgeA[i] = new double[ss];
-            EdgeB[i] = new double[ss];
-            cor[i] = new double[ss];
-            ser[i] = new double[ss];
-        }
-        for(int i = 0; i < PathC.size(); i++)
-        {
-            mapping[PathC[i]->No()] = i ;
-        }
+        EdgeA[i] = new double[ss];
+        EdgeB[i] = new double[ss];
+        cor[i] = new double[ss];
+        ser[i] = new double[ss];
     }
-    else
+    for(int i = 0; i < PathC.size(); i++)
     {
-        _pEdgeA = new double  *[ss]   ;
-        _pEdgeB = new double  *[ss]   ;
-        _pcor = new double    *[ss]   ;
-        _pser = new double    *[ss]   ;
-        for( int i = 0 ; i < ss ; i++ )
-        {
-            _pEdgeA[i] = new double[ss] ;
-            _pEdgeB[i] = new double[ss] ;
-            _pcor[i] = new double[ss]   ;
-            _pser[i] = new double[ss]   ;
-        }
-        for( int i = 0; i < _vPathC.size(); i++)
-        {
-            mapping[ _vPathC[i]->No()] = i;
-        }
-        
+        mapping[PathC[i]->No()] = i ;
     }
+    
     int     im = 0, jn = 0                  ;
     double  a = 0, b = 0, cc = 0, err = 0   ;
     string line  ;
@@ -432,20 +414,11 @@ void ReadCpInfo( string filename , int mod )//讀關聯性和迴歸線
         if( mapping.find(im) == mapping.end() || mapping.find(jn) == mapping.end() )
             continue;
         int ii = mapping[im],jj = mapping[jn];
-        if( mod == 1 )
-        {
-            EdgeA[ii][jj] = a   ;
-            EdgeB[ii][jj] = b   ;
-            cor[ii][jj] = cc    ;
-            ser[ii][jj] = err   ;
-        }
-        else
-        {
-            _pEdgeA[ii][jj] = a ;
-            _pEdgeB[ii][jj] = b ;
-            _pcor[ii][jj] = cc  ;
-            _pser[ii][jj] = err ;
-        }
+        
+        EdgeA[ii][jj] = a   ;
+        EdgeB[ii][jj] = b   ;
+        cor[ii][jj] = cc    ;
+        ser[ii][jj] = err   ;
     }
     file.close();
 }
@@ -1292,7 +1265,7 @@ bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//
         //--------------------- All Vertice were dominated -----------------------------------
         if( wh_point == 0 )
         {
-            printf("Shortlist size: %d \n",cc);
+            printf(", Shortlist size: %d \n",cc);
             return true;
         }
         cand.clear();
@@ -1458,9 +1431,9 @@ int HashAllClockBuffer()//GenerateSAT中一開始就呼叫
 }
 
 //------------------Classification of Mine/Candidate/Safe Pathes--------------------------------//
-void CheckPathAttackbility(double year,double margin,bool flag,double PLUS)
+void CheckPathAttackbility( )
 {
-    printf("Checking\n");
+    printf( CYAN"[Info] Classify paths into Mine/Cand/Safe...\n");
     double OriginalE = ERROR    ;
     period    = 0.0             ;
     int right = 0               ;
@@ -1505,19 +1478,18 @@ void CheckPathAttackbility(double year,double margin,bool flag,double PLUS)
         //-------------------------Period Timing with Aging---------------------------------------//
         double Dij =  ( pptr->In_time(pptr->length() - 1) - pptr->Out_time(0) ) ;//沒老化,沒PV
         double pp = ( 1 + AgingRate(WORST, static_cast<double>(year + PLUS)))*( Dij ) + Tcq + (clks - clkt) + pptr->GetST();
-        pp *= margin ;
+        pp *= tight ;
         if( pp > period )
         {
             period = pp;
         }
     }
     
-    if( flag )
-    {
-        cout << "Clock Period = " << period << endl;
-        info[0] = period;
-    }
-    cout << "PathR.size() : " << PathR.size()  << endl ;
+    
+        
+    info[0] = period;
+    
+    printf(CYAN"[Info] Path total size : %ld\n", PathR.size());
     for( int i = 0; i < PathR.size(); i++ )
     {
         PATH* pptr = &PathR[i];
@@ -1687,38 +1659,29 @@ void CheckPathAttackbility(double year,double margin,bool flag,double PLUS)
             }
         }
     }
-    if( flag )
+    if ( PathC.size() <= 0 )
     {
-        printf( "PathC : \n" ) ;
-        for( int i = 0 ; i < PathC.size() ; i++ )
-        {
-            if( PathC[i]->GetMine() )
-            {   printf( RED ) ; }
-            else
-            {   printf( BLUE ); }
-            printf("%s -> %s " , PathC[i]->Gate(0)->GetName().c_str() , PathC[i]->Gate(PathC[i]->length()- 1)->GetName().c_str() ) ;
-            printf(" Length = %d ", PathC[i]->length() ) ;
-            printf("PDP = %d, _mapsize = %ld \n" RESET , PathC[i]->pldcc, PathC[i]->_mapdcc.size() ) ;
-        }
-        printf("PI:%d PO:%d C:%d M:%d \n",aa,bb,aa+bb+cc-dd,dd );
-        info[1] = aa; info[2] = bb; info[3] = cc; info[4] = dd;
+        printf( RED"[Warning] No Path Can Attack!\n" ) ;
     }
-    printf("Finishing Checking\n");
+    if ( !CheckNoVio(year + PLUS) )
+    {
+        printf( RED"[Warning] Too Tight Clock Period! \n" ) ;
+    }
     return;
 }
 
 bool CheckNoVio( double year /* = (year+PLUS) in main.cpp */ )//Called in main.cpp for early checking.
 {
-    cout << "Checking Violation... ";
+    printf( CYAN"[Info] Checking Violation... \n");
     for (int i = 0; i < PathR.size(); i++)
     {
         if ( !Vio_Check( &PathR[i], (long double)year, AgingRate(WORST, year),0,0,0 ) )
         {
-            cout << "Path" << i << " Violation!" << endl;
+            printf( "----Path %d Violation! \n", i );
             return false ;
         }
     }
-    cout << "No Violation!" << endl;
+    printf( CYAN"[Info] Check Result: " GREEN"No Timing Violation!\n" RESET);
     return true;
 }
 
@@ -2117,10 +2080,47 @@ void GenerateSAT( string filename /*file.cnf*/,double year )
     file.close();
 }
 
+void printDCCLocation()
+{
+    
+    system("./minisat ./CNF/best.cnf ./CNF/temp.sat 1> ./sat_report/minisat_std_output.txt 2> ./sat_report/minisat_warn_output.txt ");
+    
+    fstream file;
+    file.open( "./CNF/temp.sat", ios::in );//temp.sat是minisat執行完的結果
+    string line;
+    getline( file, line );
+    //--------------------- No Solution----- -------------------------------------
+    int n1,n2;
+    
+    //--------------------- Decode & Put DCC -------------------------------------
+    while( file >> n1 >> n2 )
+    {
+        if (n1 < 0 && n2 < 0)
+        cbuffer_decode[(-n1 - 1) / 2]->SetDcc(DCC_NONE);
+        else if(n1>0 && n2 < 0)
+        cbuffer_decode[(n1 - 1) / 2]->SetDcc(DCC_S);//20% DCC
+        else if(n1<0 && n2>0)
+        cbuffer_decode[(-n1 - 1) / 2]->SetDcc(DCC_F);//80% DCC
+        else
+        cbuffer_decode[(n1 - 1) / 2]->SetDcc(DCC_M);//40% DCC
+    }
+    int cdcc = 0 ;
+    _vDCCGate.clear() ;
+    //--------------------- Show Result------- -------------------------------------
+    printf( CYAN"----------------- DCC Placed Location --------------------\n" RESET);
+    for( int i = 0; i < cbuffer_decode.size() ;i++ )
+    {
+        if ( cbuffer_decode[i]->GetDcc() != DCC_NONE )
+        {
+            ++cdcc ;
+            cout << CYAN << cdcc << " : " BLUE<< cbuffer_decode[i]->GetName() << ' ' << cbuffer_decode[i]->GetDcc() << RESET << endl;
+            _vDCCGate.push_back(cbuffer_decode[i]) ;
+        }
+    }
+    printf( CYAN"------------------------------------------------------------\n" RESET);
+}
 int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
 {
-    //printf("進入CallSatAndReadReport() \n") ;
-    
     //-----------初始化，每個Path，其首尾Flip-flop的clock-Path都不放DCC--------------------------------//
     for (int i = 0; i < PathR.size(); i++)
     {
@@ -2170,11 +2170,6 @@ int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
     for( int i = 0; i < cbuffer_decode.size() ;i++ ){
         if ( cbuffer_decode[i]->GetDcc() != DCC_NONE ){
             ++cdcc ;
-            if( flag == 1 )
-            {
-                cout << cdcc << " : " << cbuffer_decode[i]->GetName() << ' ' << cbuffer_decode[i]->GetDcc() << endl;
-                _vDCCGate.push_back(cbuffer_decode[i]) ;
-            }
         }
     }
     return cdcc;
@@ -2182,8 +2177,9 @@ int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
 
 void CheckOriLifeTime()
 {							//有可能決定Tc的path不在candidate中(mine裡)
-    cout << "Check Original Lifetime." << endl;		//為何會有>10? 較後面的Path slack大很多(自身lifetime長) 且和前面cp的關連低(前端老化不足)
+    printf( CYAN"[Info] Check Original Lifetime...\n" );		//為何會有>10? 較後面的Path slack大很多(自身lifetime長) 且和前面cp的關連低(前端老化不足)
     double up = 10.0, low = 0.0;					//為何會有接近7? 1.Path之間的slack都接近=>不管老化哪個都不會太差 2.path之間相關度都高
+
     for (int i = 0; i < PathC.size(); i++)          //不同candidate會造成此處不同... 取聯集
     {
         if (!PathC[i]->CheckAttack())
@@ -2192,8 +2188,9 @@ void CheckOriLifeTime()
         //PathC[i] --> Path[j]
         for( int j = 0; j < PathC.size(); j++ )
         {
+            
             if( EdgeA[i][j] > 9999 )
-                continue;
+                continue ;
             double st = 1.0, ed = 50.0, mid = 0 ;
             while (ed - st > 0.0001)
             {
@@ -2201,6 +2198,7 @@ void CheckOriLifeTime()
                 double upper, lower;
                 CalPreInv(AgingRate(WORST, mid), upper, lower, i, j, mid);				//y = ax+b => 分成lower bound/upper bound去求最遠能差多少
                 double Aging_P;
+
                 if (upper > AgingRate(WORST, mid))
                     Aging_P = AgingRate(WORST, mid);
                 else if (upper < AgingRate(BEST, mid))
@@ -2212,6 +2210,7 @@ void CheckOriLifeTime()
                 else
                     ed = mid;
             }
+    
             if( mid < e_upper )
                 e_upper = mid;				//最早的點(因為發生錯誤最早在此時)
             st = 1.0; ed = 50.0;
@@ -2241,11 +2240,11 @@ void CheckOriLifeTime()
             low = e_lower;
         
     }
-    cout << up << ' ' << low << endl;
+    printf( CYAN"[Info] Original LT = " GREEN"%f " CYAN"~ " GREEN"%f \n", up, low );
 }
 
 
-double CalQuality( double year,double &up,double &low , int mode )
+double CalQuality( double &up, double &low , int mode )
 {
     up = 10.0, low = 0.0;
     for( int i = 0; i < PathC.size(); i++ )
