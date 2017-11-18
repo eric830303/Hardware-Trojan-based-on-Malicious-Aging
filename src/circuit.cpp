@@ -494,7 +494,7 @@ void *parallel_compare( void * data   )
             double U = rand() / (double)RAND_MAX;
             double V = rand() / (double)RAND_MAX;
             double Z = sqrt(-2 * log(U))*cos(2 * 3.14159265354*V) ;//常態分佈的隨機
-            double Vth_pv =  Z*0.01  ;
+            double Vth_pv =  Z*PVRange ;
             double AgeRate_ttl = CalAgingRateWithVthPV( Vth_pv, mydata->year ) ;//Consider PV & NBTI
             DelayP += AgeRate_ttl*( pptr->Out_time(i) - pptr->In_time(i) ) ;//DelayP ++ delta
         }
@@ -2121,16 +2121,16 @@ void printDCCLocation()
 }
 int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
 {
-    //-----------初始化，每個Path，其首尾Flip-flop的clock-Path都不放DCC--------------------------------//
+    //----------- Init [Don't Put DCC]-----------------------------------------
     for (int i = 0; i < PathR.size(); i++)
     {
         GATE* stptr = PathR[i].Gate(0);
         GATE* edptr = PathR[i].Gate(PathR[i].length() - 1) ;
-        //------------ClkPath of FF(head/left) Initialization-----
-        for (int j = 0; j < stptr->ClockLength(); j++)
+        //------------ Left CLK Path Init--------------------------------------
+        for( int j = 0; j < stptr->ClockLength(); j++ )
             stptr->GetClockPath(j)->SetDcc(DCC_NONE);
-        //------------ClkPath of FF(end/right) Initialization-------------------------------------//
-        for (int j = 0; j < edptr->ClockLength(); j++)
+        //------------ Right CLK Path Init-------------------------------------
+        for( int j = 0; j < edptr->ClockLength(); j++ )
             edptr->GetClockPath(j)->SetDcc(DCC_NONE);
     }
     
@@ -2144,12 +2144,11 @@ int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
     file.open( "./CNF/temp.sat", ios::in );//temp.sat是minisat執行完的結果
     string line;
     getline( file, line );
-    //--------------------- No Solution----- -------------------------------------
+    //--------------------- No Solution---------------------------------------------
     if( line.find("UNSAT")!=string::npos )  return 0 ;
     
     int n1,n2;
-    
-    //--------------------- Decode & Put DCC -------------------------------------
+    //--------------------- Decode & [Put DCC] -------------------------------------
     while( file >> n1 >> n2 )
     {
         if (n1 < 0 && n2 < 0)
@@ -2250,15 +2249,13 @@ double CalQuality( double &up, double &low , int mode )
     for( int i = 0; i < PathC.size(); i++ )
     {
         if( !PathC[i]->CheckAttack() )  continue ;
-        
-        //eteration upper/lower
+    
         double e_upper = 10000, e_lower = 10000 ;
-        
-        for (int j = 0; j < PathC.size(); j++)//計算時從全部可攻擊點(不是僅算被選點)
+        for (int j = 0; j < PathC.size(); j++)
         {
             if( EdgeA[i][j] > 9999 )   continue;
-            double st = 0.0 , ed = 10.0, mid = 0 ;//這裡改過
-            while( ed - st > 0.001 )//用binary search, 每次都從a去推b的老化
+            double st = 0.0 , ed = 10.0, mid = 0 ;
+            while( ed - st > 0.001 )
             {
                 mid = (st + ed) / 2;
                 double upper , lower ;

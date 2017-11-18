@@ -259,43 +259,18 @@ private:
     double          supper          ;
     double          slower          ;
     bool            attackable      ;
-    bool            pv_attackable   ;
     bool            safe            ;
-    bool            pv_safe         ;
     bool            choose          ;
     bool            tried           ;//Used for refine
     bool            mine            ;//
-    bool            pv_mine         ;
     bool            cand            ;
-    bool            pv_cand         ;
     unsigned        no              ;
     PATHTYPE        type            ;
-    int             pv_pre_ctr      ;
-    int             pv_pos_ctr      ;
-    int             pv_candtmine_ctr;
-    int             pv_shtmine_ctr  ;
-    int             pv_shtsafe_ctr  ;
-    int             pv_candtsafe_ctr;
-    int             pv_safetcand_ctr;
-    int             pv_safetmine_ctr;
-    int             pv_candtcand_ctr;
-    int             pv_mtm          ;//mine to mine
-    int             pv_mtc          ;//mine to candidate
-    int             pv_mtf          ;//mine to safe
     int             path_id         ;
-    double          dij_delta_pre   ;
-    double          dij_delta_pre_mn;
-    double          dij_delta_pre_mx;
-    double          dij_delta_pos   ;
-    double          dij_delta_pos_mx;
-    double          dij_delta_pos_mn;
     
 public:
     //--------------------Constructor/Destructor-------------------------//
     int pldcc                           ;
-    int cand_ctr                        ;
-    int mine_ctr                        ;
-    int safe_ctr                        ;
     vector< struct dccinfo * > _vPDP    ;
     map< tuple<int,int,AGT,AGT>,struct dccinfo * > _mapdcc ;
     PATH():attackable(false),choose(false)
@@ -304,25 +279,7 @@ public:
         setuptime = holdtime = -1       ;
         gate_list.clear()               ;
         timing.clear()                  ;
-        pv_pre_ctr = pv_pos_ctr = 0     ;
-        mine = cand = pv_mine = false   ;
-        pv_candtmine_ctr = 0            ;
-        pv_shtmine_ctr = 0              ;
-        pv_shtsafe_ctr = 0              ;
-        pv_candtsafe_ctr = 0            ;
-        pv_attackable = false           ;
-        pv_safetcand_ctr = 0            ;
-        pv_safetmine_ctr = 0            ;
-        pv_candtcand_ctr = 0            ;
-        pv_mtm = pv_mtc = pv_mtf = 0    ;
-        dij_delta_pre = 0               ;
-        dij_delta_pos = 0               ;
-        dij_delta_pre_mn = 100          ;
-        dij_delta_pre_mx = -100         ;
-        dij_delta_pos_mn = 100          ;
-        dij_delta_pos_mx = -100         ;
         pldcc = 0                       ;
-        cand_ctr = mine_ctr = safe_ctr=0;
         _vPDP.clear()                   ;
         _mapdcc.clear()                 ;
     }
@@ -338,61 +295,17 @@ public:
     vector< TIMING > * gTiming()    { return &timing             ;  }
     TIMING *    gTiming( int i )    { return &timing[i]          ;  }
     GATE*       Gate( int i )       { return gate_list[i]        ;  }
-    double      GetDijPreMin( )     { return dij_delta_pre_mn    ;  }
-    double      GetDijPosMin( )     { return dij_delta_pos_mn    ;  }
-    void        SetDijPreMin( double t){ if( t < dij_delta_pre_mn ) dij_delta_pre_mn = t ; }
-    void        SetDijPosMin( double t){ if( t < dij_delta_pos_mn ) dij_delta_pos_mn = t ; }
-    double      GetDijPreMax( )     { return dij_delta_pre_mx    ;  }
-    double      GetDijPosMax( )     { return dij_delta_pos_mx    ;  }
-    void        SetDijPreMax( double t){ if( t > dij_delta_pre_mx ) dij_delta_pre_mx = t ; }
-    void        SetDijPosMax( double t){ if( t > dij_delta_pos_mx ) dij_delta_pos_mx = t ; }
     double      In_time( int i )    { return timing[i].in_time() ;  }
     double      Out_time( int i )   { return timing[i].out_time();  }
     double      PV_time( int i )    { return timing[i].pv()      ;  }
     void        SetNo( unsigned n ) { no =  n       ; }	//記錄在timing report上的path號碼
-    void        SetDijPVPre( double i ){ dij_delta_pre += i ; }
-    double      GetDijPVPre( )      { return dij_delta_pre  ; }
-    void        SetDijPVPos( double i ){ dij_delta_pos += i ; }
-    double      GetDijPVPos( )      { return dij_delta_pos  ; }
     unsigned    No( )               { return no     ; }
     void        SetST( double t )   { setuptime = t ; }	//setup time
     void        SetHT( double t )   { holdtime = t  ; }
-    void        SetCandTCand()      { pv_candtcand_ctr++;  }
-    int         GetCandTCand()      { return pv_candtcand_ctr ; }
-    void        SetSafeTCand()      { pv_safetcand_ctr++ ; }
-    int         GetSafeTCand()      { return pv_safetcand_ctr ; }
-    void        SetSafeTMine()      { pv_safetmine_ctr++ ; }
-    int         GetSafeTMine()      { return pv_safetmine_ctr ; }
-    void        SetMineTCand()      { pv_mtc++      ; }
-    int         GetMineTCand()      { return pv_mtc ; }
-    void        SetMineTSafe()      { pv_mtf++      ; }
-    int         GetMineTSafe()      { return pv_mtf ; }
-    void        SetMineTMine()      { pv_mtm++      ; }
-    int         GetMineTMine()      { return pv_mtm ; }
-    void        SetPreCtr( )        { pv_pre_ctr++  ; }
-    void        SetPosCtr( )        { pv_pos_ctr++  ; }
     void        SetMine( bool t )   { mine = t      ; }
-    void        SetPVMine( bool t ) { pv_mine = t   ; if( t )    mine_ctr++ ; }
     void        SetCand( bool t )   { cand = t      ; }
-    void        SetPVCand( bool t ) { pv_cand = t   ; if( t ) cand_ctr++ ; }
-    void        SetPVSafe( bool t ) { pv_safe = t   ; }
-    void        SetPVAtk( bool t )  { pv_attackable = t ; }
     bool        GetCand( )          { return cand   ; }
     bool        GetMine( )          { return mine   ; }
-    bool        GetPVMine( )        { return pv_mine; }
-    bool        GetPVSafe( )        { return pv_safe; }
-    bool        GetPVCand( )        { return pv_cand; }
-    bool        GetPVAtk()         { return pv_attackable ; }
-    void        SetPVCandTMine( )   { pv_candtmine_ctr++; }
-    void        SetPVCandTSafe( )   { pv_candtsafe_ctr++; }
-    void        SetPVShTMine( )     { pv_shtmine_ctr++  ; }
-    void        SetPVShTSafe( )     { pv_shtsafe_ctr++  ; }
-    int         GetPVCandTMine( )   { return pv_candtmine_ctr ; }
-    int         GetPVCandTSafe( )   { return pv_candtsafe_ctr ; }
-    int         GetPVShTMine( )     { return pv_shtmine_ctr   ; }
-    int         GetPVShTSafe( )     { return pv_shtsafe_ctr   ; }
-    int         GetPreCtr( )        { return pv_pre_ctr ; }
-    int         GetPosCtr( )        { return pv_pos_ctr ; }
     void        SetPathID( int i )  { path_id = i ; }
     int         GetPathID( )        { return path_id ; }
     void        SetCTE( double t )  { clock_to_end = t  ; }	//clock 到末端flip-flop的時間

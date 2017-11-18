@@ -120,9 +120,9 @@ void AddNode( )
 }
 void RemoveAdditionalDCC( bool * bestnode )
 {
-    GenerateSAT("./CNF/sat.cnf", year )        ;
-    system("cp ./CNF/sat.cnf ./CNF/backup.cnf")      ;
-    RemoveRDCCs()                        ;
+    GenerateSAT("./CNF/sat.cnf", year )         ;
+    system("cp ./CNF/sat.cnf ./CNF/backup.cnf") ;
+    RemoveRDCCs()                               ;
     
     _sInfo->dccs  = CallSatAndReadReport(0) ;
     if( _sInfo->dccs == 0 || _sInfo->oridccs < _sInfo->dccs ) //After RemoveDCC,if we get NoSol/Poor Sol, recover the previous backup
@@ -255,31 +255,6 @@ void ReadParameter( int argc, char* argv[] )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
-//              Show The Change of Role of Path After PV                          //
-////////////////////////////////////////////////////////////////////////////////////
-void PrintPath( PATH &pptr )
-{
-    if( pptr.GetCand()   )      printf("OC ")       ;
-    if( pptr.Is_Chosen() )      printf("OS ")       ;
-    if( pptr.IsSafe()    )      printf("OF ")       ;
-    if( pptr.GetMine()   )      printf("OM ")       ;
-    //-----------------------------------------------------------------------------
-    if( pptr.GetPVCand() )      printf("PC ")       ;
-    if( pptr.GetPVSafe() )      printf("PF ")       ;
-    if( pptr.GetPVMine() )      printf("PM ")       ;
-}
-void PrintPath( PATH *pptr )
-{
-    if( pptr->GetCand()   )     printf("OC ")       ;
-    if( pptr->Is_Chosen() )     printf("OS ")       ;
-    if( pptr->IsSafe()    )     printf("OF ")       ;
-    if( pptr->GetMine()   )     printf("OM ")       ;
-    //-----------------------------------------------------------------------------
-    if( pptr->GetPVCand() )     printf("PC ")       ;
-    if( pptr->GetPVSafe() )     printf("PF ")       ;
-    if( pptr->GetPVMine() )     printf("PM ")       ;
-}
-////////////////////////////////////////////////////////////////////////////////////
 //              Release Memory                                                    //
 ////////////////////////////////////////////////////////////////////////////////////
 void release( HASHTABLE *hptr )
@@ -332,13 +307,19 @@ void PV_Monte_Simulation(  double bu, double bl  )
     
     double PV_monteU = 0, PV_monteL = 0 ;
     double L = year-ERROR, R = year+ERROR ;
-
+    chrono::steady_clock::time_point starttime, endtime, pre_time, ed_time ;
+    chrono::duration<double>  PVSeedTime, TotalPVSeedTime ;
+    pre_time = chrono::steady_clock::now();
     //-----------------------------------------------------------------------------------
-    for( int i = 0 ; i < PVtimes ; i++ )
+    for( int i = 1 ; i <= PVtimes ; i++ )
     {
+        
         PV_monteU = PV_monteL = 0.0              ;
         printf( YELLOW "[ %d/%d Instance Simulation ]\n" RESET , i, PVtimes )   ;
+        starttime = chrono::steady_clock::now();
         Monte_PVCalQuality( PV_monteU, PV_monteL )      ;
+        endtime = chrono::steady_clock::now();
+        PVSeedTime = chrono::duration_cast<chrono::duration<double>>(endtime - starttime);
         printf( "Q(PV) : ") ;
         if( PV_monteU < year - ERROR ) printf( RED )  ;
         else                           printf( RESET );
@@ -347,10 +328,16 @@ void PV_Monte_Simulation(  double bu, double bl  )
         else                           printf( RESET );
         printf("%f\n", PV_monteL );
         printf( RESET );
+        cout << "PV Seed Time = " << CYAN << PVSeedTime.count() << RESET<< endl  ;
         Region( PV_monteU, PV_monteL, L, R ) ;
         fprintf( fupper100, "%f\n", PV_monteU )          ;
         fprintf( flower100, "%f\n", PV_monteL )          ;
     }
+    ed_time = chrono::steady_clock::now();
+    TotalPVSeedTime = chrono::duration_cast<chrono::duration<double>>(ed_time - pre_time) ;
+    printf( CYAN"-------------- PV Summary------------------------------------\n") ;
+    cout << CYAN << "Total Seed #    = " << GRN << PVtimes << RESET << endl ;
+    cout << CYAN << "Total Seed Time = " << GRN << TotalPVSeedTime.count() << RESET << endl ;
 }
 ////////////////////////////////////////////////////////////////////////////////////
 //              PV Simulator - Instance Generator                                 //

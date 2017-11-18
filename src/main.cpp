@@ -6,6 +6,9 @@
 #include <time.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <math.h>
 #include "circuit.h"
 #include "aging.h"
@@ -89,20 +92,21 @@ int main( int argc, char* argv[] )
     CheckOriLifeTime()  ;
     printSetting()      ;
     //------------- Variables Declaraion -----------------------------------------------------
-    int     c_sol    = 0     ;
-    int     c_nosol  = 0     ;
     bool *  bestnode = new bool[PathC.size()] ;
+    chrono::steady_clock::time_point starttime, endtime,  pre_time, end_time;
+    chrono::duration<double> TotalTime, MDSTime, TotalMDSTime ;
+    pre_time = chrono::steady_clock::now();
     _sInfo = new struct info() ;
     //--------------- Main Area ---------------------------------------------------------------
     for( int tryi = 0 ; tryi < trylimit; tryi++ )
     {
+        starttime = chrono::steady_clock::now();
         printf( YELLOW "\nRound : %d/%d--------------------------\n" RESET , tryi, trylimit ) ;
         //------------- [1] MDS ----------------------------------------------------------------
         if( !ChooseVertexWithGreedyMDS( year, false, hptr )  )
         {
             printf( RED "No Dominate Set! \n" RESET )      ;
             ChooseVertexWithGreedyMDS( year, true , hptr ) ;
-            c_nosol++   ;
             continue    ;
         }
         GenerateSAT("./CNF/sat.cnf", year )             ;
@@ -115,7 +119,9 @@ int main( int argc, char* argv[] )
                 printf( RED "Current Best Q = %f ~ %f \n", _sInfo->bestup, _sInfo->bestlow ) ;
             }
             printf( RED "No Solution!\n" RESET ) ;
-            c_nosol++  ;
+            endtime = chrono::steady_clock::now();
+            MDSTime = chrono::duration_cast<chrono::duration<double>>(endtime - starttime);
+            cout << "Iteration Time = " << CYAN << MDSTime.count() << RESET << endl ;
             continue   ;
         }
         else
@@ -125,12 +131,16 @@ int main( int argc, char* argv[] )
         
            
         //------------- [2] Add Node -------------------------------------------------------------
-        AddNode( )                      ;
+        //AddNode( )                      ;
         //------------- [3] Remove Additional DCCs --------------------------------------------------
         RemoveAdditionalDCC( bestnode ) ;
         //------------- [4] Reverse Current Soltion ---------------------------------------------------
         ReverseSol( )                   ;
-        c_sol++;
+        
+        endtime = chrono::steady_clock::now();
+        MDSTime = chrono::duration_cast<chrono::duration<double>>(endtime - starttime);
+        cout << "Iteration Time = " << CYAN << MDSTime.count() << RESET << endl ;
+        TotalMDSTime += MDSTime ;
     }//for(tryi)
         
     if( _sInfo->bestup > 10 )
@@ -145,22 +155,19 @@ int main( int argc, char* argv[] )
     printDCCLocation()                      ;
     CallSatAndReadReport(1)                 ;
     PV_Monte_Simulation( _sInfo->bestup, _sInfo->bestlow  ) ;
+    end_time = chrono::steady_clock::now()  ;
+    TotalTime = chrono::duration_cast<chrono::duration<double>>( end_time - pre_time );
     //------------- Release Memory --------------------------------------------------------------
     release( hptr ) ;
     //------------- Show Final Results ----------------------------------------------------------
-    printf( CYAN"\n\n--------------Final Result------------------------------------\n") ;
+    printf( CYAN"--------------Final Result------------------------------------\n") ;
     printSetting()                              ;
     printDCCLocation()                          ;
-    int BestDccs = CallSatAndReadReport(1)      ;
-    int cands = info[1]+info[2]+info[3]-info[4] ;
-    RefineResult( year, true )                  ;//設為true才不會return數值.
+    cout << CYAN << "Total execution Time = " << GREEN << TotalTime.count() << RESET << endl ;
+    //RefineResult( year, true )                  ;//設為true才不會return數值.
     
     
-    printf("BEST Q = %f ~ %f \n", _sInfo->bestup, _sInfo->bestlow )         ;
-    printf("Q = %f ~ %f \n", _sInfo->bestup ,_sInfo->bestlow   )            ;
-    printf("dccs # = %d \n" , BestDccs )                    ;
-    printf("cands # = %d \n" , cands )                      ;
-    printf("mine # = %d \n" , (int)info[4] )                ;
+    
     printf("\n");
     return 0;
 }

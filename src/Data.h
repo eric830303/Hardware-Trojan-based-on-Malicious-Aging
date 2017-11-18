@@ -7,7 +7,9 @@
 #include <fstream>
 #include <algorithm>
 #include <math.h>
+#include <time.h>
 #include <assert.h>
+#include <chrono>
 #include "circuit.h"
 using namespace std ;
 
