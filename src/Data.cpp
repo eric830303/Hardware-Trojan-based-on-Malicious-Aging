@@ -371,10 +371,6 @@ double Monte_PVCalQuality( double &up, double &low )
     map< double , worse* > worse    ;
     vector< double> monte           ;
     monte.clear( )                  ;
-    /*
-    int Dots100_ctr  = 0            ;
-    int Dots95_ctr  = 0             ;
-    */
     //-------------------- Generate a New Instance with PV --------------------------
     GeneratePVCkt( )                            ;
     
@@ -414,8 +410,8 @@ double Monte_PVCalQuality( double &up, double &low )
                 {
                     mid = (st + ed) / 2;
                     AgR_A_Wst_mid = CalPathAginRateWithPV( PathC[i], mid ) ;//Paht A worst-case aging rate
-                    AgR_B_RL  = CalPreAging( AgR_A_Wst_mid, i, j, mid ) ;//Path B aging rate by regression line(RL)
-                    AgR_B_MC = Z*( ser[i][j] * (1 + AgR_A_Wst_mid)/(1 + AgR_A_Wst_ten) ) + AgR_B_RL;//Path B aging rate by monte-carlo(MC)
+                    AgR_B_RL      = CalPreAging( AgR_A_Wst_mid, i, j, mid ) ;//Path B aging rate by regression line(RL)
+                    AgR_B_MC      = Z*( ser[i][j] * (1 + AgR_A_Wst_mid)/(1 + AgR_A_Wst_ten) ) + AgR_B_RL;//Path B aging rate by monte-carlo(MC)
                     
                     if( AgR_B_MC > AgR_A_Wst_mid )
                         AgR_B_MC = AgR_A_Wst_mid ;
@@ -431,8 +427,8 @@ double Monte_PVCalQuality( double &up, double &low )
                 }
             }
             monte.push_back( lt );
-        }//for(tt)
-    }//for(_vPathC[i])
+        }//for( tt )
+    }//for( PathC[i] )
     
     sort( monte.begin(), monte.end() )  ;
     int front = 0                       ;

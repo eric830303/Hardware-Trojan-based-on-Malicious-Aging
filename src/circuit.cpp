@@ -1443,7 +1443,8 @@ void CheckPathAttackbility( )
         right = 3               ;
         left  = 4               ;
     }
-    //----------------------------Do Every Path(Year: year+PLUS )--------------------------------//
+    //---------------------------- Set Period ---------------------------------------------------
+    //Set such period such that original LT resides between 7~9 years.
     for( int i = 0; i < PathR.size(); i++ )
     {
         PATH* pptr = &PathR[i];
@@ -1451,12 +1452,12 @@ void CheckPathAttackbility( )
         GATE* stptr = pptr->Gate(0)     ;
         pptr->SetPathID(i)              ;
         
-        //-------------------------Non-Aging Timing----------------------------------------------//
+        //-------------------------Non-Aging Timing----------------------------------------------
         double clks = pptr->GetCTH()    ;//Timing betwn clk ~ FF(head), without Aging.
         double clkt = pptr->GetCTE()    ;//Timing betwn clk ~ FF(end) , without Aging.
         double Tcq = pptr->Out_time(0) - pptr->In_time(0) ;//clk~Q(FF(head)), without Aging
         
-        //-------------------------Plus Aging Timing of each Buffer on clock path----------------//
+        //-------------------------Plus Aging Timing of each Buffer on clock path----------------
         //Timing(right): clock --> FF(end) , clkt'(modfied) += clkt(original) + aging_timing(no DCC)
         for( int i = 0; i < edptr->ClockLength(); i++ )
         {
@@ -1469,13 +1470,12 @@ void CheckPathAttackbility( )
             double delay = stptr->GetClockPath(i)->GetOutTime() - stptr->GetClockPath(i)->GetInTime() ;
             clks += ( delay )*AgingRate(DCC_NONE, year + PLUS)  ;
         }
-        //-------------------------FF Timing with Aging------------------------------------------//
+        //-------------------------FF Timing with Aging------------------------------------------
         if( stptr->GetType() != "PI" )//PI是wire時，沒FF，自然沒Tcq
         {
             Tcq *= (1.0 + AgingRate(FF, static_cast<double>(year + PLUS)));
         }
-        
-        //-------------------------Period Timing with Aging---------------------------------------//
+        //-------------------------Period Timing with Aging---------------------------------------
         double Dij =  ( pptr->In_time(pptr->length() - 1) - pptr->Out_time(0) ) ;//沒老化,沒PV
         double pp = ( 1 + AgingRate(WORST, static_cast<double>(year + PLUS)))*( Dij ) + Tcq + (clks - clkt) + pptr->GetST();
         pp *= tight ;
@@ -1485,11 +1485,8 @@ void CheckPathAttackbility( )
         }
     }
     
-    
-        
-    info[0] = period;
-    
-    printf(CYAN"[Info] Path total size : %ld\n", PathR.size());
+    //------------------------------ Cand/Mine/Ssfe --------------------------------------------
+    printf( CYAN"[Info] Path total size : %ld\n", PathR.size() );
     for( int i = 0; i < PathR.size(); i++ )
     {
         PATH* pptr = &PathR[i];
@@ -2329,66 +2326,7 @@ double CalPathAginRateWithPV( PATH * pptr, double year )
     }
     return Dij_pv/Dij - 1 ;
 }
-double Monte_CalQuality(double year, double &up, double &low, int mode )
-{
-    up = 10.0, low = 0.0;
-    vector<double> monte;
-    monte.clear();
-    int TryT = 3000 / PathC.size();
-    if( TryT < 30 ) TryT = 30     ;
-    
-    /////////////////////////////////////////////////////////////////////////////
-    //1.Assume Path[i]'s aging condition were worse，Cal Path[j]'s lifetime.   //
-    //2.Repeat above statement fot TryT times.                                 //
-    //3.Path[i] E { candidates } , Path[j] E { Mine+Candidates }.              //
-    /////////////////////////////////////////////////////////////////////////////
-    for( int i = 0; i < PathC.size() ; i++ )
-    {
-        if( !PathC[i]->CheckAttack() )  continue ;
-        
-        for( int tt = 0; tt < TryT; tt++ )
-        {
-            double lt = 10000 ;
-            for( int j = 0; j < PathC.size(); j++ )
-            {
-                if( EdgeA[i][j] > 9999 )    continue;
-                double st = 1.0, ed = 10.0, mid = 0 ;
-                double U = rand() / (double)RAND_MAX;
-                double V = rand() / (double)RAND_MAX;
-                double Z = sqrt(-2 * log(U))*cos(2 * 3.14159265354*V) ;
-                while( ed - st > 0.001 )
-                {
-                    mid = (st + ed) / 2;
-                    double Aging_mean = CalPreAging( AgingRate(WORST, mid), i, j, mid );
-                    double Aging_P = Z*(ser[i][j] * (1 + AgingRate(WORST, mid)) / (1 + AgingRate(WORST, 10))) + Aging_mean;
-                    if( Aging_P > AgingRate(WORST, mid) )
-                        Aging_P = AgingRate(WORST, mid);
-                    if( Vio_Check(PathC[j], (long double)mid, Aging_P, mode, Qal_Thre, Qal_Times ) )
-                        st = mid;
-                    else
-                        ed = mid;
-                }
-                if( mid < lt )
-                    lt = mid;
-            }
-            monte.push_back(lt);
-        }
-    }
-    sort( monte.begin(), monte.end() )  ;
-    int front = 0                       ;
-    int back = (int)monte.size() - 1    ;
-    up = monte[front], low = monte[back];
-    
-    //---------------- Remove Remotest 5% Dots ----------------------------------
-    while (front + monte.size() - 1 - back <= monte.size()/20)
-    {
-        if (absff(monte[front] - (double)year)>absff(monte[back] - (double)year))
-            up = monte[++front];
-        else
-            low = monte[--back];
-    }
-    return 0.0;
-}
+
 
 bool CheckImpact( PATH* pptr )//此path的頭尾FFs，這兩個FF的clock path若有放DCC就回傳true, and vice versa.
 {
@@ -2414,8 +2352,7 @@ void RemoveRDCCs()
 {
     map< GATE*, bool > must;
     
-    
-    //--------Mark DCC positions that is on Shortlist paths' clk path---------------------//
+    //--------Mark DCC positions that is on Shortlist paths' clk path---------------------
     for ( int i = 0; i < PathC.size(); i++ )
     {
         if ( !PathC[i]->Is_Chosen() )//若此pah非在shortlist中，則不做
@@ -2424,13 +2361,13 @@ void RemoveRDCCs()
         GATE* stptr = pptr->Gate(0) ;//FF(head)
         GATE* edptr = pptr->Gate( pptr->length() - 1 ) ;//FF(end)
         
-        //FF(head)'s clk path:
+        //---- Left CLK Path --------------------------------------
         for( int j = 0; j < stptr->ClockLength(); j++)
         {
             if ( stptr->GetClockPath(j)->GetDcc() != DCC_NONE )
                 must[stptr->GetClockPath(j)] = true;
         }
-        //FF(end)'s clk path:
+        //---- Right CLK Path --------------------------------------
         for( int j = 0; j < edptr->ClockLength(); j++)
         {
             if (edptr->GetClockPath(j)->GetDcc()!= DCC_NONE )
