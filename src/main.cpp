@@ -74,8 +74,10 @@ int main( int argc, char* argv[] )
         printf("./research [ckt] [Desired Year] [restart times][refine times][PV times][ERROR limit]  \n");
         return 0;
     }
-    
+    chrono::steady_clock::time_point starttime, endtime,  pre_time, end_time, attktime;
+    chrono::duration<double> TotalTime, MDSTime, TotalMDSTime, attackable ;
     //------------ Reading ----------------------------------------------------------------
+    pre_time = chrono::steady_clock::now();
     ReadParameter( argc, argv )     ;//Read Parameter.txt
     ReadCircuit( filename )         ;//Read *.vg
     Circuit[0].PutClockSource()     ;
@@ -84,7 +86,9 @@ int main( int argc, char* argv[] )
     ReadAgingData()                 ;//AgingRate.txtRead *.cp
     AdjustConnect()                 ;
     //------------ Cand,Mine,Safe -----------------------------------------------------------
-    CheckPathAttackbility( ) ;
+    CheckPathAttackbility( )        ;
+    attktime   = chrono::steady_clock::now( ) ;
+    attackable = chrono::duration_cast<chrono::duration<double>>(attktime - pre_time);
     ReadCpInfo( filename )          ;//Read *.cp
     
     HASHTABLE *hptr = new HASHTABLE(16,(unsigned)PathC.size()) ;
@@ -93,9 +97,6 @@ int main( int argc, char* argv[] )
     printSetting()      ;
     //------------- Variables Declaraion -----------------------------------------------------
     bool *  bestnode = new bool[PathC.size()] ;
-    chrono::steady_clock::time_point starttime, endtime,  pre_time, end_time;
-    chrono::duration<double> TotalTime, MDSTime, TotalMDSTime ;
-    pre_time = chrono::steady_clock::now();
     _sInfo = new struct info() ;
     //--------------- Main Area ---------------------------------------------------------------
     for( int tryi = 0 ; tryi < trylimit; tryi++ )
@@ -163,7 +164,8 @@ int main( int argc, char* argv[] )
     printf( CYAN"--------------Final Result------------------------------------\n") ;
     printSetting()                              ;
     printDCCLocation()                          ;
-    cout << CYAN << "Total execution Time = " << GREEN << TotalTime.count() << RESET << endl ;
+    cout << CYAN << "C/M/S Finding Time   = " << GREEN << attackable.count() << RESET << endl ;
+    cout << CYAN << "Total execution Time = " << GREEN << TotalTime.count()  << RESET << endl ;
     //RefineResult( year, true )                  ;//設為true才不會return數值.
     
     

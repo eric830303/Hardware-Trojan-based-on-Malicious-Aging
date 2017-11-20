@@ -161,7 +161,9 @@ void ReverseSol( )
 void printSetting(  )
 {
     printf( CYAN "------------------- Setting --------------------------------\n" RESET ) ;
-    printf( CYAN "PLUS  = " GRN "%f\n", PLUS ) ;
+    printf( CYAN "Benchmark  = " GRN "%s\n", filename.c_str() ) ;
+    printf( CYAN "Year  = " GRN "%f\n", year  ) ;
+    printf( CYAN "PLUS  = " GRN "%f\n", PLUS  ) ;
     printf( CYAN "TIGHT = " GRN "%f\n", tight ) ;
     printf( CYAN "Final Refimement times = " GRN "%d \n", FINAL ) ;
     
@@ -281,17 +283,19 @@ void Region( double &year_lower, double &year_upper, double &L, double &R )
     
     if( year_lower < L )
     {
-        if( year_upper < L )        R1++ ;
-        else if( year_upper < R )   R2++ ;
-        else                        R3++ ;
+        if( year_upper < L )       {   R1++ ; printf("R1++\n"); }
+        else if( year_upper < R )  {   R2++ ; printf("R2++\n"); }
+        else                       {   R3++ ; printf("R3++\n"); } ;
     }
     else if( year_lower < R )
     {
-        if(  year_upper < R )       R6++ ;
-        else                        R4++ ;
+        if(  year_upper < R )      {   R6++ ; printf("R6++\n"); }
+        else                       {   R4++ ; printf("R4++\n"); }
     }
-    else                            R5++ ;
-    printf( "R1 = %d, R2 = %d, R3 = %d, R4 = %d, R5 = %d, R6 = %d\n\n", R1, R2, R3, R4, R5, R6) ;
+    else                           {   R5++ ; printf("R5++\n"); }
+    printf( "R3 = %d, R4 = %d, R5 = %d\n", R3, R4, R5 ) ;
+    printf( "R2 = %d, R6 = %d\n", R2, R6 ) ;
+    printf( "R1 = %d\n\n", R1 ) ;
 }
 ////////////////////////////////////////////////////////////////////////////////////
 //              PV Simulator                                                      //
