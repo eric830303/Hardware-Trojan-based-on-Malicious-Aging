@@ -198,7 +198,7 @@ void ReadCircuit( string filename )
         }
     }
     file.close();
-    printf( CYAN"[Info] Finish Reading Circuit\n");
+    printf( CYAN"   ==> Finish Reading Circuit\n");
     return;
 }
 //////////////////////////////////////////////////////////////////
@@ -207,7 +207,7 @@ void ReadCircuit( string filename )
 void ReadPath_l( string filename )
 {
     string rptname = "./benchmark/" + filename + ".rpt"  ;
-    printf( CYAN"[Info] Reading Cirtical Paths Information...\n") ;
+    printf( CYAN"[Info] Reading Cirtical Paths Info...\n") ;
     fstream file     ;
     string line      ;
     string sp        ;
@@ -354,6 +354,7 @@ void ReadPath_l( string filename )
             PathR.push_back(*p);
         sp = "";
     }
+    printf( CYAN"   ==> Finish Reading Critical Paths info\n");
     file.close();
 }
 
@@ -1487,9 +1488,8 @@ void CheckPathAttackbility( )
             period = pp;
         }
     }
-    
     //------------------------------ Cand/Mine/Ssfe --------------------------------------------
-    printf( CYAN"[Info] Path total size : %ld\n", PathR.size() );
+    printf( CYAN"   ==> Path total size : " GREEN"%ld\n" RESET, PathR.size() );
     for( int i = 0; i < PathR.size(); i++ )
     {
         PATH* pptr = &PathR[i];
@@ -1661,12 +1661,13 @@ void CheckPathAttackbility( )
     }
     if ( PathC.size() <= 0 )
     {
-        printf( RED"[Warning] No Path Can Attack!\n" ) ;
+        printf( RED"    ==> [Warning] No Path Can Attack!\n" ) ;
     }
     if ( !CheckNoVio(year + PLUS) )
     {
-        printf( RED"[Warning] Too Tight Clock Period! \n" ) ;
+        printf( RED"    ==> [Warning] Too Tight Clock Period! \n" ) ;
     }
+    printf( CYAN"   ==> Finish Classifing \n");
     return;
 }
 
@@ -1677,11 +1678,11 @@ bool CheckNoVio( double year /* = (year+PLUS) in main.cpp */ )//Called in main.c
     {
         if ( !Vio_Check( &PathR[i], (long double)year, AgingRate(WORST, year),0,0,0 ) )
         {
-            printf( "----Path %d Violation! \n", i );
+            printf( "   ==> Path %d Violation! \n", i );
             return false ;
         }
     }
-    printf( CYAN"[Info] Check Result: " GREEN"No Timing Violation!\n" RESET);
+    printf( CYAN"   ==> " GREEN"No Timing Violation!\n" RESET);
     return true;
 }
 
@@ -2258,7 +2259,7 @@ void CheckOriLifeTime()
             low = e_lower;
         
     }
-    printf( CYAN"[Info] Original LT = " GREEN"%f " CYAN"~ " GREEN"%f \n", up, low );
+    printf( CYAN"   ==> " GREEN"%f " CYAN"~ " GREEN"%f \n", up, low );
 }
 
 
