@@ -102,11 +102,12 @@ int main( int argc, char* argv[] )
     for( int tryi = 0 ; tryi < trylimit; tryi++ )
     {
         starttime = chrono::steady_clock::now();
-        printf( YELLOW "\nRound : %d/%d--------------------------\n" RESET , tryi, trylimit ) ;
+
+        printf( YELLOW "\n\n\n----------- Round : " RESET"%d/%d " YELLOW"-------------------\n" , tryi, trylimit ) ;
         //------------- [1] MDS ----------------------------------------------------------------
         if( !ChooseVertexWithGreedyMDS( year, false, hptr )  )
         {
-            printf( RED "No Dominate Set! \n" RESET )      ;
+            printf( "\n ==> " RED"No Dominate Set! \n" RESET )      ;
             ChooseVertexWithGreedyMDS( year, true , hptr ) ;
             continue    ;
         }
@@ -115,24 +116,21 @@ int main( int argc, char* argv[] )
         ChooseVertexWithGreedyMDS( year, true , hptr )  ;
         if( !_sInfo->oridccs )
         {
-            if( _sInfo->bestup < 10 && _sInfo->bestlow > 1 )
-            {
-                printf( RED "Current Best Q = %f ~ %f \n", _sInfo->bestup, _sInfo->bestlow ) ;
-            }
-            printf( RED "No Solution!\n" RESET ) ;
+            printf( "   ==> " RED "NO Solution\n" RESET  ) ;
             endtime = chrono::steady_clock::now();
             MDSTime = chrono::duration_cast<chrono::duration<double>>(endtime - starttime);
+            printf( YELLOW "---------------------------------------------\n" RESET );
             cout << "Iteration Time = " << CYAN << MDSTime.count() << RESET << endl ;
             continue   ;
         }
         else
         {
-            printf( GREEN "A Solution Exist\n" RESET ) ;
+            printf( "   ==> " GREEN "Solution Exist\n" RESET  ) ;
         }
         
            
         //------------- [2] Add Node -------------------------------------------------------------
-        //AddNode( )                      ;
+        //AddNode( )                    ;
         //------------- [3] Remove Additional DCCs --------------------------------------------------
         RemoveAdditionalDCC( bestnode ) ;
         //------------- [4] Reverse Current Soltion ---------------------------------------------------
@@ -140,6 +138,7 @@ int main( int argc, char* argv[] )
         
         endtime = chrono::steady_clock::now();
         MDSTime = chrono::duration_cast<chrono::duration<double>>(endtime - starttime);
+        printf( YELLOW "---------------------------------------------\n" RESET );
         cout << "Iteration Time = " << CYAN << MDSTime.count() << RESET << endl ;
         TotalMDSTime += MDSTime ;
     }//for(tryi)
@@ -151,7 +150,7 @@ int main( int argc, char* argv[] )
     }
     
     //------------- PV Monte Simulation ---------------------------------------------------------
-    printf( CYAN"\n\n[Info] Begin PV-Simulation.... \n" )       ;
+    printf( CYAN"\n\n[Info] Begin PV-Simulation.... \n" )   ;
     printSetting()                          ;
     printDCCLocation()                      ;
     CallSatAndReadReport(1)                 ;

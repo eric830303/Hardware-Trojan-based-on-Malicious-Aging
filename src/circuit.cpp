@@ -1222,6 +1222,9 @@ bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//
         hashp->PutNowStatus();
         return true          ;
     }
+
+    printf( YELLOW "[1] [MDS] \n" RESET );
+    printf( YELLOW "Shortlist: " RESET );
     //--------------------- Var Declare ---------------------------------------------------------------
     int  *out_deg = new int[ PathC.size() ]   ;//white neighbors #
     int  *color   = new int[ PathC.size() ]   ;//black(-1),gray(0),white(1)
@@ -1265,7 +1268,7 @@ bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//
         //--------------------- All Vertice were dominated -----------------------------------
         if( wh_point == 0 )
         {
-            printf(", Shortlist size: %d \n",cc);
+            printf("\n");
             return true;
         }
         cand.clear();
@@ -1684,13 +1687,16 @@ bool CheckNoVio( double year /* = (year+PLUS) in main.cpp */ )//Called in main.c
 
 void GenerateSAT( string filename /*file.cnf*/,double year )
 {
-    //printf("GenerateSAT()\n") ;
-    //double SATError = ERROR ;
+    printf( "SAT Encoding ") ;
+    chrono::steady_clock::time_point sat_st_time, sat_ed_time ;
+    chrono::duration<double> SATTime ;
+    
     fstream file ;
     fstream temp ;
     file.open( filename.c_str(), ios::out);
     map< GATE*, bool > exclusive;
     
+    sat_st_time = chrono::steady_clock::now();
     //----------------En/Decode CLK Buffer that appear on Cand/Mine's CLK Path------------------------//
     HashAllClockBuffer() ;//每個clockbuffer之編號為在cbuffer_code內對應的號碼*2+1,*2+2
     
@@ -2073,7 +2079,9 @@ void GenerateSAT( string filename /*file.cnf*/,double year )
         }
         
     }
-    //printf("Leave GenerateSAT()\n");
+    sat_ed_time = chrono::steady_clock::now();
+    SATTime = chrono::duration_cast<chrono::duration<double>>( sat_ed_time - sat_st_time );
+    cout << "(" << CYAN << SATTime.count() << RESET << "s)" <<endl  ;
     file.close();
 }
 
@@ -2118,6 +2126,10 @@ void printDCCLocation()
 }
 int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
 {
+    printf( "SAT Decoding ");
+    chrono::steady_clock::time_point st_time, ed_time ;
+    chrono::duration<double> callsattime ;
+    st_time   = chrono::steady_clock::now( ) ;
     //----------- Init [Don't Put DCC]-----------------------------------------
     for (int i = 0; i < PathR.size(); i++)
     {
@@ -2142,7 +2154,13 @@ int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
     string line;
     getline( file, line );
     //--------------------- No Solution---------------------------------------------
-    if( line.find("UNSAT")!=string::npos )  return 0 ;
+    if( line.find("UNSAT")!=string::npos )
+    {
+        ed_time     = chrono::steady_clock::now( ) ;
+        callsattime = chrono::duration_cast<chrono::duration<double>>( ed_time - st_time )    ;
+        cout << "(" << CYAN << callsattime.count() << RESET << "s)"<<endl ;
+        return 0 ;
+    }
     
     int n1,n2;
     //--------------------- Decode & [Put DCC] -------------------------------------
@@ -2157,12 +2175,16 @@ int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
         else
             cbuffer_decode[(n1 - 1) / 2]->SetDcc(DCC_M);//40% DCC
     }
-    
     file.close() ;
-    int cdcc = 0 ;
     
-    _vDCCGate.clear() ;
+    //--------------------- Cal SAT Time ------------------------------------------
+    ed_time     = chrono::steady_clock::now( ) ;
+    callsattime = chrono::duration_cast<chrono::duration<double>>( ed_time - st_time )    ;
+    cout << "(" << CYAN << callsattime.count() << RESET << "s)"<<endl ;
+    
     //--------------------- Show Result------- -------------------------------------
+    int cdcc = 0 ;
+    _vDCCGate.clear() ;
     for( int i = 0; i < cbuffer_decode.size() ;i++ ){
         if ( cbuffer_decode[i]->GetDcc() != DCC_NONE ){
             ++cdcc ;
@@ -2242,7 +2264,12 @@ void CheckOriLifeTime()
 
 double CalQuality( double &up, double &low , int mode )
 {
-    up = 10.0, low = 0.0;
+    printf("Calculate LT ");
+    chrono::steady_clock::time_point q_st_time, q_ed_time ;
+    chrono::duration<double> qtime ;
+    q_st_time = chrono::steady_clock::now();
+    
+    up = 10.0 ; low = 0.0 ;
     for( int i = 0; i < PathC.size(); i++ )
     {
         if( !PathC[i]->CheckAttack() )  continue ;
@@ -2276,7 +2303,7 @@ double CalQuality( double &up, double &low , int mode )
             }
             //ppt:最後因為所以的interval同時存在, 最早的值就是電路發生錯誤的時間 所以取各path最小的upper, lower bound做為整體的upper/lower bound
             
-            st = 0.0, ed = 10.0   ;
+            st = 0.0 ; ed = 10.0   ;
             while ( ed - st > 0.001 )
             {
                 mid = (st + ed) / 2;
@@ -2309,6 +2336,10 @@ double CalQuality( double &up, double &low , int mode )
             low = e_lower;
         }
     }//fot i
+    
+    q_ed_time = chrono::steady_clock::now();
+    qtime = chrono::duration_cast<chrono::duration<double>>( q_ed_time - q_st_time );
+    cout << "(" << CYAN << qtime.count() << RESET << "s)"<<endl ;
     return 0.0 ;
 }
 double CalPathAginRateWithPV( PATH * pptr, double year )
@@ -2351,7 +2382,8 @@ bool CheckImpact( PATH* pptr )//此path的頭尾FFs，這兩個FF的clock path�
 void RemoveRDCCs()
 {
     map< GATE*, bool > must;
-    
+    printf( YELLOW "---------------------------------------------\n" RESET );
+    printf( YELLOW"[2] [Remove Spare DCCs]\n" RESET )      ;
     //--------Mark DCC positions that is on Shortlist paths' clk path---------------------
     for ( int i = 0; i < PathC.size(); i++ )
     {
@@ -2575,10 +2607,20 @@ bool AnotherSol()//將結果反向
     
     getline( solution, line ) ;
     if( line.find("UNSAT") != string::npos ){   return false; }
+    printf("SAT Encoding ");
+    chrono::steady_clock::time_point q_st_time, q_ed_time ;
+    chrono::duration<double> qtime ;
+    q_st_time = chrono::steady_clock::now();
     while ( solution >> dccno)//將原有的解反向後，放回(ios:app)進'sat.cnf'
     {
         file << -dccno << ' ';
     }
+    //--------- Timing ------------------------------
+    q_ed_time = chrono::steady_clock::now();
+    qtime = chrono::duration_cast<chrono::duration<double>>( q_ed_time - q_st_time );
+    cout << "(" << CYAN << qtime.count() << RESET << "s)" << endl  ;
+    
+    //---------- File Close --------------------------
     file << endl;
     file.close();
     solution.close();

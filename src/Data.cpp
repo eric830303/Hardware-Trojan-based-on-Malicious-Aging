@@ -120,14 +120,22 @@ void AddNode( )
 }
 void RemoveAdditionalDCC( bool * bestnode )
 {
-    GenerateSAT("./CNF/sat.cnf", year )         ;
+    //GenerateSAT("./CNF/sat.cnf", year )         ;
     system("cp ./CNF/sat.cnf ./CNF/backup.cnf") ;
-    RemoveRDCCs()                               ;
+    RemoveRDCCs()                               ;//GenerateSAT(app)
     
     _sInfo->dccs  = CallSatAndReadReport(0) ;
-    if( _sInfo->dccs == 0 || _sInfo->oridccs < _sInfo->dccs ) //After RemoveDCC,if we get NoSol/Poor Sol, recover the previous backup
+    if( _sInfo->dccs == 0 ) //After RemoveDCC,if we get NoSol/Poor Sol, recover the previous backup
     {
+        printf( "   ==> " RED "NO Solution\n" RESET  ) ;
+        printf( "   ==> Recover prior solution by decoding..\n" RESET );
         system("cp ./CNF/backup.cnf ./CNF/sat.cnf") ;
+    }
+    else if(  _sInfo->oridccs < _sInfo->dccs ) //After RemoveDCC,if we get NoSol/Poor Sol, recover the previous backup
+    {
+        printf( "   ==> " MAGENTA "DCC # is Greater\n" RESET  ) ;
+        printf( "   ==> Recover prior solution by decoding\n" RESET );
+        system( "cp ./CNF/backup.cnf ./CNF/sat.cnf" ) ;
     }
     _sInfo->dccs = CallSatAndReadReport(0)           ;
     CalQuality( _sInfo->upper, _sInfo->lower, 0/*Q_mode*/ ) ;//Calculate quality.
@@ -137,12 +145,16 @@ void RemoveAdditionalDCC( bool * bestnode )
         for( int i = 0; i < PathC.size(); i++ ){ bestnode[i] = PathC[i]->Is_Chosen() ;   }
         system("cp ./CNF/sat.cnf ./CNF/best.cnf")   ;
     }
+    /*
     printf("After Remove Spare DCCs: \n")                ;
-    printf("Q = %f ~ %f (此次MDS解)\n", _sInfo->upper , _sInfo->lower  )  ;
-    printf("Q = %f ~ %f (至今最好解)\n", _sInfo->bestup, _sInfo->bestlow ) ;
+    printf("    Q = %f ~ %f (此次MDS解)\n", _sInfo->upper , _sInfo->lower  )  ;
+    printf("    Q = %f ~ %f (至今最好解)\n", _sInfo->bestup, _sInfo->bestlow ) ;
+     */
 }
 void ReverseSol( )
 {
+    printf( YELLOW "---------------------------------------------\n" RESET );
+    printf( YELLOW"[3] [Reversing Prior Solution]\n" RESET )   ;
     for( int i = 0; i < reftime ; i++ )
     {
         if( !AnotherSol() ){ break ; }
@@ -153,9 +165,10 @@ void ReverseSol( )
         {
             system("cp ./CNF/sat.cnf ./CNF/best.cnf")  ;
         }
-        printf("After Reversion: \n" )                       ;
-        printf("Q = %f ~ %f (此次MDS解)\n", _sInfo->upper , _sInfo->lower  )   ;
-        printf("Q = %f ~ %f (至今最好解)\n", _sInfo->bestup , _sInfo->bestlow ) ;
+        printf( YELLOW "---------------------------------------------\n" RESET );
+        printf( YELLOW "[4] [Final Quality] \n" RESET );
+        printf("   Q = %f ~ %f (此次MDS解)\n", _sInfo->upper , _sInfo->lower  )   ;
+        printf("   Q = %f ~ %f (至今最好解)\n", _sInfo->bestup , _sInfo->bestlow ) ;
     }
 }
 void printSetting(  )
@@ -334,8 +347,8 @@ void PV_Monte_Simulation(  double bu, double bl  )
         printf( RESET );
         cout << "PV Seed Time = " << CYAN << PVSeedTime.count() << RESET<< endl  ;
         Region( PV_monteU, PV_monteL, L, R ) ;
-        fprintf( fupper100, "%f\n", PV_monteU )          ;
-        fprintf( flower100, "%f\n", PV_monteL )          ;
+        fprintf( flower100, "%f\n", PV_monteU )          ;
+        fprintf( fupper100, "%f\n", PV_monteL )          ;
     }
     ed_time = chrono::steady_clock::now();
     TotalPVSeedTime = chrono::duration_cast<chrono::duration<double>>(ed_time - pre_time) ;
