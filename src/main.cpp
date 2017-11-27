@@ -39,6 +39,7 @@ double arc_thd = 0      ;
 double year = 0         ;
 struct info *_sInfo = NULL;
 double period = 0       ;
+double tc_mgn = 0       ;
 //////////////////////////////////////////////////////////////////
 vector<PATH>  PathR     ;
 vector<PATH*> PathC     ;

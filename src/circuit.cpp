@@ -28,6 +28,7 @@ extern double PVRange   ;
 extern double PLUS      ;
 extern double tight     ;
 extern double year      ;
+extern double tc_mgn    ;
 //////////////////////////////////////////////////////////////////
 extern int TotalTimes   ;
 extern int Threshold    ;
@@ -1489,6 +1490,7 @@ void CheckPathAttackbility( )
         }
     }
     //------------------------------ Cand/Mine/Ssfe --------------------------------------------
+    period = period + period*tc_mgn ;
     printf( CYAN"   ==> Path total size : " GREEN"%ld\n" RESET, PathR.size() );
     for( int i = 0; i < PathR.size(); i++ )
     {

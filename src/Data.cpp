@@ -18,6 +18,7 @@
 extern double arc_thd          ;
 extern double year             ;
 extern double period           ;
+extern double tc_mgn           ;
 extern struct info *_sInfo     ;
 /////////////////////////////////////////////////////////////
 extern long int dot_ctr        ;
@@ -178,6 +179,7 @@ void printSetting(  )
     printf( CYAN "Year  = " GRN "%f\n", year  ) ;
     printf( CYAN "PLUS  = " GRN "%f\n", PLUS  ) ;
     printf( CYAN "TIGHT = " GRN "%f\n", tight ) ;
+    printf( CYAN "Tc Margin  = " GRN "%f\n", tc_mgn  ) ;
     printf( CYAN "Final Refimement times = " GRN "%d \n", FINAL ) ;
     
     if( Q_mode != 0 )
@@ -251,6 +253,7 @@ void ReadParameter( int argc, char* argv[] )
             }
             else{   PLUS = atof(line.c_str() + 4)   ;   }
         }
+        if( line.find("Tc_Margin")              != string::npos )    tc_mgn    = atof(line.c_str() + 9 )    ;
         if( line.find("PV-Aware Open")          != string::npos )    Q_mode    = 3                          ;// --->
         if( line.find("PV-Aware Close")         != string::npos )    Q_mode    = 0                          ;// exclude pv
         if( line.find("PV_Aware_thd_right")     != string::npos )    R_Thre    = atoi(line.c_str() + 18 )   ;
