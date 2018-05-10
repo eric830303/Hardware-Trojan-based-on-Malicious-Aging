@@ -480,14 +480,9 @@ double Monte_PVCalQuality(double year, double &up, double &low)
     map< double , worse* > worse    ;
     vector< double> monte           ;
     monte.clear( )                  ;
-    /*
-    int Dots100_ctr  = 0            ;
-    int Dots95_ctr  = 0             ;
-    */
+    
     //-------------------- Generate a New Instance with PV --------------------------
-    //_vPathC.clear( )                            ;
-    GeneratePVCkt( )                            ;
-    //DefCandMineSafe( year, tight, true, PLUS )  ;
+    GeneratePVCkt( )                ;
     
     //--------------------- Analyze the New Instance --------------------------------
     double U = 0, V = 0, Z = 0 ;
@@ -541,16 +536,6 @@ double Monte_PVCalQuality(double year, double &up, double &low)
                     AgR_AtoB = AgR_B_MC ;
                 }
             }
-            //####------- If PathJ's LT Diverge -------------------------------------------
-            /*
-            if( lt <= year - ERROR || lt >= year + ERROR )
-            {
-                struct worse *_pBadData = new struct worse( PathC[i], pptr , AgR_AtoB ) ;
-                worse[ lt ] = _pBadData ;
-                 
-                Dots100_ctr++ ;
-            }
-             */
             monte.push_back( lt );
         }//for(tt)
     }//for(_vPathC[i])
@@ -569,86 +554,7 @@ double Monte_PVCalQuality(double year, double &up, double &low)
             low = monte[--back];
     }
     
-    //------------ Investigation for Single Instance -----------------------------------
-    /*
-    for( int i = front ; i <= back ; i++ )
-    {
-        double lt = monte[i] ;
-        if( lt > year - ERROR && lt < year + ERROR ) continue ;
-        if( worse.find(lt) != worse.end() )
-        {
-            auto pptr = worse.find(lt)->second->_pPj     ;
-            double r  = worse.find(lt)->second->_DijDelta;
-            Dots95_ctr++ ;//95% dots
-            if( lt <= year - ERROR )
-            {
-                pptr->SetPreCtr()    ;
-                pptr->SetDijPVPre(r) ;
-                pptr->SetDijPreMax(r);
-                pptr->SetDijPreMin(r);
-                GPre_Diver_Dot++     ;
-            }
-            if( lt >= year + ERROR )
-            {
-                pptr->SetPosCtr()    ;
-                pptr->SetDijPVPos(r) ;
-                pptr->SetDijPosMax(r);
-                pptr->SetDijPosMin(r);
-                GPos_Diver_Dot++     ;
-            }
-            
-            //--------- Record PathJ's Role Change in Each Instance -------------------
-            //--------- Role : Candidate/Mine/Safe ------------------------------------
-            if( pptr->GetCand() && pptr->GetPVMine() )  { pptr->SetPVCandTMine() ; }
-            if( pptr->GetCand() && pptr->GetPVSafe() )  { pptr->SetPVCandTSafe() ; }
-            if( pptr->GetCand() && pptr->GetPVCand() )  { pptr->SetCandTCand()   ; }
-            if( pptr->Is_Chosen() && pptr->GetPVMine() ){ pptr->SetPVShTMine()   ; }
-            if( pptr->Is_Chosen() && pptr->GetPVSafe() ){ pptr->SetPVShTSafe()   ; }
-            if( pptr->IsSafe() && pptr->GetPVMine() )   { pptr->SetSafeTMine()   ; }
-            if( pptr->IsSafe() && pptr->GetPVCand() )   { pptr->SetSafeTCand()   ; }
-            if( pptr->GetMine() && pptr->GetPVCand())   { pptr->SetMineTCand()   ; }
-            if( pptr->GetMine() && pptr->GetPVMine())   { pptr->SetMineTMine()   ; }
-            if( pptr->GetMine() && pptr->GetPVSafe())   { pptr->SetMineTSafe()   ; }
-        }//if( worse.find )
-    }//for( monte )
-    //--------- Print this Instance Info ---------------------------------------------
-    printf( "TryT = %d \n",TryT )                        ;
-    printf( "Divergent Dots(100) = %d \n", Dots100_ctr ) ;
-    printf( "Divergent Dots(95) = %d \n", Dots95_ctr )   ;
-    if( up <= year - ERROR )
-    {
-        if( worse.find(up) != worse.end() )
-        {
-            auto  w = (worse.find(up))->second ;
-            PATH* pptri = w->_pPi   ;
-            PATH* pptrj = w->_pPj   ;
-            printf( RED "[ PreFail Investigation ] \n" )   ;
-            printf( "-Path[I] %s ~ %s \n",LNameI, RNameI ) ;
-            printf( "-Path[J] %s ~ %s \n",LNameJ, RNameJ ) ;
-            printf( "-Path[J] Aging Rate : %f \n" , (w->_DijDelta)*100 ) ;
-            printf( "-Path[J] Role Change : \n--> " ) ;
-            PrintPath( pptrj )      ;
-            printf( "\n" RESET )    ;
-        }
-    }
-    if( low >= year + ERROR )
-    {
-        if( worse.find(low) != worse.end() )
-        {
-            auto  w = (worse.find(low))->second ;
-            PATH* pptri = w->_pPi   ;
-            PATH* pptrj = w->_pPj   ;
-            printf( GRN "[ PosFail Investigation ] \n" ) ;
-            printf( "-Path[I] %s ~ %s \n",LNameI, RNameI ) ;
-            printf( "-Path[J] %s ~ %s \n",LNameJ, RNameJ ) ;
-            printf( "-Path[J] Aging Rate : %f \n" , (w->_DijDelta)*100  ) ;
-            printf( "-Path[J] Role Change : \n--> ") ;
-            PrintPath( pptrj )      ;
-            printf("\n" RESET )     ;
-        }
-    }
-    //------------ Release Memory ------------------------------------------------------
-     */
+    
     worse.clear()  ;
     
     return 0.0;

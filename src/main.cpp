@@ -265,11 +265,7 @@ int main( int argc, char* argv[] )
     int BestDccs = CallSatAndReadReport(1)      ;
     int cands = info[1]+info[2]+info[3]-info[4] ;
     RefineResult( year, true )                  ;//設為true才不會return數值.
-    /*
-    if( monte_s ){
-        printf("BEST Q = %f ~ %f (Monte)\n",monteU,monteL)  ;
-    }
-     */
+    
     printf("BEST Q = %f ~ %f \n", bestup, bestlow )         ;
     printf("Q = %f ~ %f \n", bestup ,bestlow   )            ;
     printf("dccs # = %d \n" , BestDccs )                    ;
