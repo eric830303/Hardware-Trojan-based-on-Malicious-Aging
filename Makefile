@@ -69,6 +69,7 @@ info:
 .PHONY:clean
 clean:
 	$(RM) research $(OBJDIR)/*.o
+	$(RM) CNF/*.cnf
 .PHONY:clean
 clean_file:
 	$(RM) *.rpt *.cp *.vg

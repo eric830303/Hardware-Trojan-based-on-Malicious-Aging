@@ -3,6 +3,6 @@
 #include"typedef.h"
 
 double AgingRate( AGINGTYPE status, double year );
-void ReadAgingData();
+
 
 #endif

@@ -15,37 +15,27 @@
 #define LNameJ pptrj->Gate(0)->GetName().c_str()
 #define RNameJ pptrj->Gate(pptrj->length() - 1)->GetName().c_str()
 /////////////////////////////////////////////////////////////
-extern double arc_thd          ;
-extern double year             ;
-extern double period           ;
-extern double tc_mgn           ;
-extern struct info *_sInfo     ;
-/////////////////////////////////////////////////////////////
-extern long int dot_ctr        ;
-/////////////////////////////////////////////////////////////
-extern int    R_Times          ;
-extern int    R_Thre           ;
-extern int    L_Times          ;
-extern int    L_Thre           ;
-extern int    Ref_Times        ;
-extern int    Ref_Thre         ;
-extern int    Qal_Times        ;
-extern int    Qal_Thre         ;
-extern int    Q_mode           ;
-extern int    FINAL            ;
-extern int    trylimit         ;
-extern int    reftime          ;
-extern int    PVtimes          ;
 
-extern bool   monte_s          ;
-extern string filename         ;
-/////////////////////////////////////////////////////////////
-extern vector <GATE*> _vDCCGate;
 
 string p = "%" ;
 /////////////////////////////////////////////////////////////
 //      Function                                           //
 /////////////////////////////////////////////////////////////
+double CIRCUIT::calConvergentVth( double dc, double exp )
+{
+    return 0.0039/2*( pow( dc*(convergent_year)*(31536000), Exp )) ;
+}
+double CIRCUIT::calSv( double dc, double VthOffset, double VthFin  )
+{
+    if( VthOffset == 0 ) return 0 ;
+    //The func refers to "hi_n_low_buffer.py"
+    double Right   = VthFin - VthOffset                  ;
+    double Time    = dc*( convergent_year )*( 31536000 ) ;
+    double C       = 0.0039/2*( pow( Time, this->Exp ) ) ;
+    return -( Right/(C) - 1 )/(VthOffset)                ;
+}
+
+
 inline double absf(double x)
 {
     if (x < 0)  return -x ;
@@ -63,7 +53,7 @@ inline double minf(double a, double b)
     if (a < b)  return a ;
     else        return b ;
 }
-bool BInv(double &bu, double &bl, double u1, double l1, double u2, double l2,double n,int &dcb,int dc1,int dc2)
+bool CIRCUIT::BInv(double &bu, double &bl, double u1, double l1, double u2, double l2,double n,int &dcb,int dc1,int dc2)
 {
     if (absf(maxf(absf(u1 - n), absf(l1 - n)) - maxf(absf(u2 - n), absf(l2 - n))) < 0.01)
     {
@@ -94,94 +84,46 @@ bool BInv(double &bu, double &bl, double u1, double l1, double u2, double l2,dou
     return true;
 }
 
-void AddNode( )
-{
-    //1.It might lead to spare dccs if we add too many nodes.
-    for( int i = 0; i < PathC.size(); i++ ){    PathC[i]->SetTried(PathC[i]->Is_Chosen()) ; }
 
-    for( int i = 0; i < reftime ; i++ )
-    {
-        int AddNodeIndex = RefineResult(year,false);
-        if( AddNodeIndex < 0 )
-        {   break   ;  }
-        else
-        {
-            PathC[AddNodeIndex]->SetChoose(true);
-            GenerateSAT("./CNF/sat.cnf", year)        ;
-        }
-        PathC[AddNodeIndex]->SetTried(true) ;
-        int dccs = CallSatAndReadReport(0)  ;
-        if( !dccs )
-        {
-            PathC[AddNodeIndex]->SetChoose(false);
-            continue;
-        }
-        _sInfo->oridccs = dccs;
-    }
-}
-void RemoveAdditionalDCC( bool * bestnode )
+void CIRCUIT::ReverseSol( )
 {
-    //GenerateSAT("./CNF/sat.cnf", year )         ;
-    system("cp ./CNF/sat.cnf ./CNF/backup.cnf") ;
-    RemoveRDCCs()                               ;//GenerateSAT(app)
-    
-    _sInfo->dccs  = CallSatAndReadReport(0) ;
-    if( _sInfo->dccs == 0 ) //After RemoveDCC,if we get NoSol/Poor Sol, recover the previous backup
-    {
-        printf( "   ==> " RED "NO Solution\n" RESET  ) ;
-        printf( "   ==> Recover prior solution by decoding..\n" RESET );
-        system("cp ./CNF/backup.cnf ./CNF/sat.cnf") ;
-    }
-    else if(  _sInfo->oridccs < _sInfo->dccs ) //After RemoveDCC,if we get NoSol/Poor Sol, recover the previous backup
-    {
-        printf( "   ==> " MAGENTA "DCC # is Greater\n" RESET  ) ;
-        printf( "   ==> Recover prior solution by decoding\n" RESET );
-        system( "cp ./CNF/backup.cnf ./CNF/sat.cnf" ) ;
-    }
-    _sInfo->dccs = CallSatAndReadReport(0)           ;
-    CalQuality( _sInfo->upper, _sInfo->lower, 0/*Q_mode*/ ) ;//Calculate quality.
-    
-    if( BInv( _sInfo->bestup, _sInfo->bestlow, _sInfo->bestup, _sInfo->bestlow, _sInfo->upper, _sInfo->lower, year,_sInfo->bestdcc,_sInfo->bestdcc,_sInfo->dccs))
-    {
-        for( int i = 0; i < PathC.size(); i++ ){ bestnode[i] = PathC[i]->Is_Chosen() ;   }
-        system("cp ./CNF/sat.cnf ./CNF/best.cnf")   ;
-    }
     /*
-    printf("After Remove Spare DCCs: \n")                ;
-    printf("    Q = %f ~ %f (此次MDS解)\n", _sInfo->upper , _sInfo->lower  )  ;
-    printf("    Q = %f ~ %f (至今最好解)\n", _sInfo->bestup, _sInfo->bestlow ) ;
-     */
-}
-void ReverseSol( )
-{
     printf( YELLOW "---------------------------------------------\n" RESET );
     printf( YELLOW"[3] [Reversing Prior Solution]\n" RESET )   ;
     for( int i = 0; i < reftime ; i++ )
     {
         if( !AnotherSol() ){ break ; }
-        _sInfo->dccs = CallSatAndReadReport(0)  ;
-        if( !(_sInfo->dccs) ){ break ;   }
-        CalQuality( _sInfo->upper, _sInfo->lower, /*Q_mode*/0 );
-        if( BInv( _sInfo->bestup, _sInfo->bestlow, _sInfo->bestup, _sInfo->bestlow, _sInfo->upper, _sInfo->lower, year, _sInfo->bestdcc, _sInfo->bestdcc, _sInfo->dccs) )
+        
+        //_sInfo->dccs = CallSatAndReadReport(0)  ;
+        if( !(CallSatAndReadReport(0)) ){ break ;   }
+        this->CalQuality( upper, lower,0 );
+        if( BInv( bestup, bestlow, bestup, bestlow, upper, lower, year, bestdcc, bestdcc, dccs) )
         {
             system("cp ./CNF/sat.cnf ./CNF/best.cnf")  ;
         }
         printf( YELLOW "---------------------------------------------\n" RESET );
         printf( YELLOW "[4] [Final Quality] \n" RESET );
-        printf("   Q = %f ~ %f (此次MDS解)\n", _sInfo->upper , _sInfo->lower  )   ;
-        printf("   Q = %f ~ %f (至今最好解)\n", _sInfo->bestup , _sInfo->bestlow ) ;
-    }
+        printf("   Q = %f ~ %f (此次MDS解)\n", upper , lower  )   ;
+        printf("   Q = %f ~ %f (至今最好解)\n", bestup , bestlow ) ;
+    }*/
+     
 }
-void printSetting(  )
+void CIRCUIT::printSetting(  )
 {
     printf( CYAN "------------------- Setting --------------------------------\n" RESET ) ;
     printf( CYAN "Benchmark  = " GRN "%s\n", filename.c_str() ) ;
     printf( CYAN "Year  = " GRN "%f\n", year  ) ;
+    printf( CYAN "C.Y.  = " GRN "%f\n", convergent_year  ) ;
+    printf( CYAN "ERROR = " GRN "%f\n", ERROR ) ;
     printf( CYAN "PLUS  = " GRN "%f\n", PLUS  ) ;
     printf( CYAN "TIGHT = " GRN "%f\n", tight ) ;
     printf( CYAN "Tc Margin  = " GRN "%f\n", tc_mgn  ) ;
+    printf( CYAN "A     = " GRN "%f\n", this->A  ) ;
+    printf( CYAN "Alpha = " GRN "%f\n", this->alpha  ) ;
+    printf( CYAN "Exp   = " GRN "%f\n", this->Exp  ) ;
     printf( CYAN "Final Refimement times = " GRN "%d \n", FINAL ) ;
     
+    /*
     if( Q_mode != 0 )
     printf( CYAN "PV-Aware Mechanism: " RED "OPEN\n" RESET );
     else
@@ -192,6 +134,7 @@ void printSetting(  )
         printf(  CYAN"Left(-->) |  (<---)Right  \n");
         printf(  GRN "%d" CYAN"/" GRN"%d     " CYAN"|      " GRN"%d" CYAN"/" GRN"%d \n", L_Thre,L_Times,R_Thre,R_Times );
     }
+     */
     printf( CYAN "DiGraph Arc Thd = " RED"%f\n", arc_thd ) ;
     printf( CYAN "Vth-pv (Std Deviation) = " GRN"%f\n", PVRange) ;
     if( monte_s )
@@ -203,81 +146,85 @@ void printSetting(  )
     printf( CYAN "------------------------------------------------------------\n" RESET ) ;
     printf( CYAN "[" BLUE"Candidate" CYAN"]\n" RESET ) ;
     int C = 0, M = 0 ;
-    for( int i = 0 ; i < PathC.size() ; i++ )
+    for( int i = 0 ; i < getPathCand().size() ; i++ )
     {
-        if( PathC[i]->GetMine() )
+        if( getPathCand().at(i)->GetMine() )
         {   continue ; }
-        printf( CYAN"[%d] Len = %d ", C,PathC[i]->length() ) ;
-        printf("PDP = %d ", PathC[i]->pldcc ) ;
-        printf( BLUE"%s -> %s \n" RESET, PathC[i]->Gate(0)->GetName().c_str() , PathC[i]->Gate(PathC[i]->length()- 1)->GetName().c_str() ) ;
+        printf( CYAN"[%d] Len = %d ", C,getPathCand().at(i)->length() ) ;
+        printf("PDP = %d ", getPathCand().at(i)->pldcc ) ;
+        printf( BLUE"%s -> %s \n" RESET, getPathCand().at(i)->Gate(0)->GetName().c_str() , getPathCand().at(i)->Gate(getPathCand().at(i)->length()- 1)->GetName().c_str() ) ;
         C++ ;
     }
     printf( CYAN "[" RED"Mine" CYAN"]\n" RESET ) ;
-    for( int i = 0 ; i < PathC.size() ; i++ )
+    for( int i = 0 ; i < getPathCand().size() ; i++ )
     {
-        if( PathC[i]->GetMine() )
+        if( getPathCand().at(i)->GetMine() )
         {
-            printf( CYAN"[%d] Len = %d ", M,PathC[i]->length() ) ;
-            printf( RED"%s -> %s\n" RESET, PathC[i]->Gate(0)->GetName().c_str() , PathC[i]->Gate(PathC[i]->length()- 1)->GetName().c_str() ) ;
+            printf( CYAN"[%d] Len = %d ", M,getPathCand().at(i)->length() ) ;
+            printf( RED"%s -> %s\n" RESET, getPathCand().at(i)->Gate(0)->GetName().c_str() , getPathCand().at(i)->Gate(getPathCand().at(i)->length()- 1)->GetName().c_str() ) ;
             M++ ;
         }
     }
     printf( CYAN "------------------------------------------------------------\n" RESET ) ;
 }
 
-void ReadParameter( int argc, char* argv[] )
+bool CIRCUIT::ReadParameter( int argc, char* argv[], string &message )
 {
     //-------------- Read CMD LINE ------------------------------------------------------------------------
     filename    = argv[1]                       ;
-    year        = atof( argv[2] )               ;
-    trylimit    = atoi( argv[3] )               ;
-    reftime     = atoi( argv[4] )               ;
-    PVtimes     = atoi( argv[5] )               ;
-    ERROR       = (argc==7)?atof(argv[6]):year*0.1;
     PLUS        = ERROR                         ;
     tight       = 1.000001                      ;
     Q_mode      = 0                             ;
     //-------------- Read Parameter.txt -------------------------------------------------------------------
     fstream file    ;
     string  line    ;
-    file.open("Parameter.txt");
+    file.open("./parameter/Parameter.txt");
     while( getline(file, line) )
     {
+        if( line.find("Vth_SD(PV)")             != string::npos )    this->PVRange   = atof(line.c_str() + 10 )    ;
+        if( line.find("TIGHT")                  != string::npos )    this->tight     = atof(line.c_str() + 5 )    ;
+        if( line.find("MDS_Times")              != string::npos )    this->trylimit  = atoi(line.c_str() + 9 )    ;
+        if( line.find("Instance_Ctr")           != string::npos )    this->PVtimes   = atoi(line.c_str() + 12 )    ;
+        if( line.find("FINAL")                  != string::npos )    this->FINAL     = atof(line.c_str() + 5 )    ;
+        if( line.find("Arc-Thd")                != string::npos )    this->arc_thd   = atof(line.c_str() + 7 )   ;
+        if( line.find("Attack_yr")              != string::npos )    this->year      = atof(line.c_str() + 9 )   ;
+        if( line.find("Error_yr")               != string::npos )    this->ERROR     = atof(line.c_str() + 8 )   ;
+        if( line.find("MONTE YES")              != string::npos )    this->monte_s   = true                       ;
+        if( line.find("Convergent_Year")        != string::npos )    this->convergent_year = atof(line.c_str() + 15 )        ;
+        if( line.find("Exp")                    != string::npos )    this->Exp       = atof(line.c_str() + 3 )        ;
+        if( line.find("A_C")                      != string::npos )  this->A         = atof(line.c_str() + 3 )        ;
+        if( line.find("Alpha")                  != string::npos )    this->alpha     = atof(line.c_str() + 5 )        ;
         if( line.find("PLUS") != string::npos )
         {
             if( line.find("auto") != string::npos){ PLUS = ERROR ;  }
             else if (line.find("fixed")!=string::npos)
             {
                 double f = atof(line.c_str() + 10)  ;
+                cout << "f " << f << endl ;
                 PLUS = f - year                     ;
             }
             else{   PLUS = atof(line.c_str() + 4)   ;   }
         }
-        if( line.find("Tc_Margin")              != string::npos )    tc_mgn    = atof(line.c_str() + 9 )    ;
-        if( line.find("PV-Aware Open")          != string::npos )    Q_mode    = 3                          ;// --->
-        if( line.find("PV-Aware Close")         != string::npos )    Q_mode    = 0                          ;// exclude pv
-        if( line.find("PV_Aware_thd_right")     != string::npos )    R_Thre    = atoi(line.c_str() + 18 )   ;
-        if( line.find("PV_Aware_tim_right")     != string::npos )    R_Times   = atoi(line.c_str() + 18 )   ;
-        if( line.find("PV_Aware_thd_left")      != string::npos  )   L_Thre    = atoi(line.c_str() + 17 )   ;
-        if( line.find("PV_Aware_tim_left")      != string::npos  )   L_Times   = atoi(line.c_str() + 17 )   ;
-        if( line.find("Vth_pv")                 != string::npos )    PVRange   = atof(line.c_str() + 6 )    ;
-        if( line.find("TIGHT")                  != string::npos )    tight     = atof(line.c_str() + 5 )    ;
-        if( line.find("FINAL")                  != string::npos )    FINAL     = atof(line.c_str() + 5 )    ;
-        if( line.find("Refine-Tim")             != string::npos )    Ref_Times = atoi(line.c_str() + 10 )   ;
-        if( line.find("Refine-Thd")             != string::npos )    Ref_Thre  = atoi(line.c_str() + 10 )   ;
-        if( line.find("Quality-Tim")            != string::npos )    Qal_Times = atoi(line.c_str() + 11 )   ;
-        if( line.find("Quality-Thd")            != string::npos )    Qal_Thre  = atoi(line.c_str() + 11 )   ;
-        if( line.find("thershold")              != string::npos )    arc_thd   = atof(line.c_str() + 9 )   ;
-        if( line.find("MONTE YES")              != string::npos )    monte_s   = true                       ;
     }
+    
+    this->VTH_CONVGNT[0] = this->calConvergentVth( 0.2, Exp ) ;//20% DCC
+    this->VTH_CONVGNT[1] = this->calConvergentVth( 0.4, Exp ) ;//40% DCC
+    this->VTH_CONVGNT[2] = this->calConvergentVth( 0.5, Exp ) ;//50% DCC/None
+    this->VTH_CONVGNT[3] = this->calConvergentVth( 0.8, Exp ) ;//80% DCC
+    this->Sv[0]          = this->calSv( 0.2, PVRange, VTH_CONVGNT[0] ) ;//20% DCC
+    this->Sv[1]          = this->calSv( 0.4, PVRange, VTH_CONVGNT[1] ) ;//20% DCC
+    this->Sv[2]          = this->calSv( 0.5, PVRange, VTH_CONVGNT[2] ) ;//20% DCC
+    this->Sv[3]          = this->calSv( 0.8, PVRange, VTH_CONVGNT[3] ) ;//20% DCC
+    
+    return true ;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
 //              Release Memory                                                    //
 ////////////////////////////////////////////////////////////////////////////////////
-void release( HASHTABLE *hptr )
+void CIRCUIT::release( HASHTABLE *hptr )
 {
-    for( int i = 0; i < PathC.size() ; i++ )
+    for( int i = 0; i < getPathCand().size() ; i++ )
     {
         delete EdgeA[i] ;
         delete EdgeB[i] ;
@@ -317,16 +264,15 @@ void Region( double &year_lower, double &year_upper, double &L, double &R )
 //              PV Simulator                                                      //
 ////////////////////////////////////////////////////////////////////////////////////
 
-bool compare( struct PVdata* A, struct PVdata*B ){  return ( A->gdist() < B->gdist() ) ; }
+//bool compare( struct PVdata* A, struct PVdata*B ){  return ( A->gdist() < B->gdist() ) ; }
 
-void PV_Monte_Simulation(  double bu, double bl  )
+void CIRCUIT::PV_Monte_Simulation(  )
 {
     vector< struct PVdata* > _vPV           ;
-    FILE *fupper100 = fopen("./quality/Q_upper100.txt","w+t") ;
-    FILE *flower100 = fopen("./quality/Q_lower100.txt","w+t") ;
+    FILE *foutput = fopen("./quality/LT.txt","w+t") ;
     
     double PV_monteU = 0, PV_monteL = 0 ;
-    double L = year-ERROR, R = year+ERROR ;
+    //double L = year-ERROR, R = year+ERROR ;
     chrono::steady_clock::time_point starttime, endtime, pre_time, ed_time ;
     chrono::duration<double>  PVSeedTime, TotalPVSeedTime ;
     pre_time = chrono::steady_clock::now();
@@ -341,17 +287,17 @@ void PV_Monte_Simulation(  double bu, double bl  )
         endtime = chrono::steady_clock::now();
         PVSeedTime = chrono::duration_cast<chrono::duration<double>>(endtime - starttime);
         printf( "Q(PV) : ") ;
-        if( PV_monteU < year - ERROR ) printf( RED )  ;
+        if( PV_monteL < year - ERROR ) printf( RED )  ;
         else                           printf( RESET );
-        printf("%f ~ ", PV_monteU );
-        if( PV_monteL > year + ERROR ) printf( GRN )  ;
+        printf("%f ~ ", PV_monteL );
+        if( PV_monteU > year + ERROR ) printf( GRN )  ;
         else                           printf( RESET );
-        printf("%f\n", PV_monteL );
+        printf("%f\n", PV_monteU );
         printf( RESET );
         cout << "PV Seed Time = " << CYAN << PVSeedTime.count() << RESET<< endl  ;
-        Region( PV_monteU, PV_monteL, L, R ) ;
-        fprintf( flower100, "%f\n", PV_monteU )          ;
-        fprintf( fupper100, "%f\n", PV_monteL )          ;
+        
+        //Region( PV_monteU, PV_monteL, L, R ) ;
+        fprintf( foutput, "%f %f\n", PV_monteL, PV_monteU )          ;
     }
     ed_time = chrono::steady_clock::now();
     TotalPVSeedTime = chrono::duration_cast<chrono::duration<double>>(ed_time - pre_time) ;
@@ -362,37 +308,37 @@ void PV_Monte_Simulation(  double bu, double bl  )
 ////////////////////////////////////////////////////////////////////////////////////
 //              PV Simulator - Instance Generator                                 //
 ////////////////////////////////////////////////////////////////////////////////////
-void GeneratePVCkt()
+void CIRCUIT::GeneratePVCkt()
 {
-    for( int i = 0 ; i < PathR.size() ; i++ )
+    for( int i = 0 ; i < this->getPathALL().size() ; i++ )
     {
         /*
         PathR[i].SetPVMine(false) ;
         PathR[i].SetPVCand(false) ;
         PathR[i].SetPVSafe(true)  ;
          */
-        for( int j = 1 ; j < PathR[i].gTiming()->size() ; j++ )
+        for( int j = 1 ; j < this->getPathALL().at(i).gTiming()->size() ; j++ )
         {
             double U = rand() / (double)RAND_MAX                    ;
             double V = rand() / (double)RAND_MAX                    ;
             double Z = sqrt(-2 * log(U))*cos(2 * 3.14159265354*V)   ;
-            PathR[i].gTiming(j)->setVth_pv( Z*PVRange )                ;//0.01 mean 10mv
+            this->getPathALL().at(i).gTiming(j)->setVth_pv( Z*PVRange )                ;//0.01 mean 10mv
         }
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////
 //              PV Simulator - Quality Calculator                                 //
 ////////////////////////////////////////////////////////////////////////////////////
-double Monte_PVCalQuality( double &up, double &low )
+double CIRCUIT::Monte_PVCalQuality( double &low, double &up )
 {
     up = 10.0; low = 0.0            ;
-    int TryT = 3000 / PathC.size()  ;
+    int TryT = 3000 / getPathCand().size()  ;
     if( TryT < 30 ) TryT = 30       ;
-    map< double , worse* > worse    ;
+    
     vector< double> monte           ;
     monte.clear( )                  ;
     //-------------------- Generate a New Instance with PV --------------------------
-    GeneratePVCkt( )                            ;
+    this->GeneratePVCkt( )          ;
     
     //--------------------- Analyze the New Instance --------------------------------
     double U = 0, V = 0, Z = 0 ;
@@ -404,10 +350,10 @@ double Monte_PVCalQuality( double &up, double &low )
     double AgR_B_RL      = 0 ;
     double AgR_B_MC      = 0 ;
     
-    for( int i = 0; i < PathC.size() ; i++ )//Path A
+    for( int i = 0; i < getPathCand().size() ; i++ )//Path A
     {
-        if( !PathC[i]->GetCand() )  continue ;
-        AgR_A_Wst_ten = CalPathAginRateWithPV( PathC[i], 10  ) ;
+        if( !getPathCand().at(i)->GetCand() )  continue ;
+        AgR_A_Wst_ten = CalPathAginRateWithPV( getPathCand().at(i), 10  ) ;
         
         for( int tt = 0; tt < TryT; tt++ )
         {
@@ -415,7 +361,7 @@ double Monte_PVCalQuality( double &up, double &low )
             AgR_AtoB = 0;
             pptr = NULL ;
         
-            for( int j = 0; j < PathC.size(); j++ )//Path B
+            for( int j = 0; j < getPathCand().size(); j++ )//Path B
             {
                 if( EdgeA[i][j] > 9999 )  continue;
                 st  = 1  ;
@@ -429,26 +375,26 @@ double Monte_PVCalQuality( double &up, double &low )
                 while( ed - st > 0.001 )
                 {
                     mid = (st + ed) / 2;
-                    AgR_A_Wst_mid = CalPathAginRateWithPV( PathC[i], mid ) ;//Paht A worst-case aging rate
+                    AgR_A_Wst_mid = CalPathAginRateWithPV( getPathCand().at(i), mid ) ;//Paht A worst-case aging rate
                     AgR_B_RL      = CalPreAging( AgR_A_Wst_mid, i, j, mid ) ;//Path B aging rate by regression line(RL)
                     AgR_B_MC      = Z*( ser[i][j] * (1 + AgR_A_Wst_mid)/(1 + AgR_A_Wst_ten) ) + AgR_B_RL;//Path B aging rate by monte-carlo(MC)
                     
                     if( AgR_B_MC > AgR_A_Wst_mid )
                         AgR_B_MC = AgR_A_Wst_mid ;
-                    if( Vio_Check( PathC[j], mid, AgR_B_MC , 0/*Exclude PV*/, 0, 0 ) )
+                    if( Vio_Check( getPathCand().at(j), mid, AgR_B_MC, 0 ) )
                         st = mid;
                     else
                         ed = mid;
                 }
                 if( mid < lt ){
                     lt = mid            ;
-                    pptr = PathC[j]     ;
+                    pptr = getPathCand().at(j)     ;
                     AgR_AtoB = AgR_B_MC ;
                 }
             }
             monte.push_back( lt );
         }//for( tt )
-    }//for( PathC[i] )
+    }//for( getPathCand().at(i) )
     
     sort( monte.begin(), monte.end() )  ;
     int front = 0                       ;
@@ -463,15 +409,14 @@ double Monte_PVCalQuality( double &up, double &low )
         else
             low = monte[--back];
     }
-    worse.clear()  ;
     
     return 0.0;
 }
 
-int shortlistsize()
+int CIRCUIT::shortlistsize()
 {
     int ctr = 0 ;
-    for( auto pptr : PathR ){ if( pptr.Is_Chosen() ) ctr++ ; }
+    for( auto pptr : this->getPathALL() ){ if( pptr.Is_Chosen() ) ctr++ ; }
     return ctr ;
 }
 

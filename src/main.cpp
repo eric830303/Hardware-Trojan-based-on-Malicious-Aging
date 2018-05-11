@@ -23,100 +23,60 @@
 #define RESET   "\x1b[0m"
 
 using namespace std     ;
-//////////////////////////////////////////////////////////////////
-//          Varaible Declaration                                //
-//////////////////////////////////////////////////////////////////
-double **EdgeA          ;
-double **EdgeB          ;
-double **cor            ;
-double **ser            ;
-double info[5]          ;
-double ERROR = 1.0      ;
-double PVRange = 0.00   ;
-double PLUS = 0.0       ;
-double tight = 1.000001 ;
-double arc_thd = 0      ;
-double year = 0         ;
-struct info *_sInfo = NULL;
-double period = 0       ;
-double tc_mgn = 0       ;
-//////////////////////////////////////////////////////////////////
-vector<PATH>  PathR     ;
-vector<PATH*> PathC     ;
-vector<CIRCUIT> Circuit ;
-//////////////////////////////////////////////////////////////////
-int    Q_mode           ;
-int    TotalTimes       ;
-int    Threshold        ;
-int    R_Times          ;
-int    R_Thre           ;
-int    L_Times          ;
-int    L_Thre           ;
-int    Ref_Times        ;
-int    Ref_Thre         ;
-int    Qal_Times        ;
-int    Qal_Thre         ;
-int    FINAL   = 0      ;
-int    trylimit= 0      ;
-int    reftime = 0      ;
-int    PVtimes = 0      ;
-bool   monte_s = false  ;
-string filename= ""     ;
-//////////////////////////////////////////////////////////////////
 
-map< double, double>pvtoSv  ;
 ////////////////////////////////////////////////////////////////////////////////////
 //              Main                                                              //
 ////////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char* argv[] )
 {
-    if( argc < 6 )
-    {
-        printf("./research [ckt] [Desired Year] [restart times][refine times][PV times][ERROR limit]  \n");
-        return 0;
-    }
     chrono::steady_clock::time_point starttime, endtime,  pre_time, end_time, attktime;
     chrono::duration<double> TotalTime, MDSTime, TotalMDSTime, attackable ;
+    
+    string message ;
     //------------ Reading ----------------------------------------------------------------
     pre_time = chrono::steady_clock::now();
-    ReadParameter( argc, argv )     ;//Read Parameter.txt
-    ReadCircuit( filename )         ;//Read *.vg
-    Circuit[0].PutClockSource()     ;
-    ReadPath_l(filename)            ;//Read *.rpt
-    ReadVth_pv_Sv()                 ;//Read Vth_pv_Sv.txt
-    ReadAgingData()                 ;//AgingRate.txtRead *.cp
-    AdjustConnect()                 ;
+    CIRCUIT circuit ;
+    if( !circuit.ReadParameter( argc, argv, message ) ) return -1 ;
+    
+    circuit.ReadCircuit( )          ;
+    circuit.PutClockSource( )       ;
+    circuit.ReadTimingReport( )     ;
+    circuit.ReadAgingData( )        ;
+    circuit.AdjustConnect( )        ;
     //------------ Cand,Mine,Safe -----------------------------------------------------------
-    CheckPathAttackbility( )        ;
+    circuit.PathClassify( )        ;
+    circuit.ReadCpInfo( )          ;//Read *.cp
     attktime   = chrono::steady_clock::now( ) ;
     attackable = chrono::duration_cast<chrono::duration<double>>(attktime - pre_time);
-    ReadCpInfo( filename )          ;//Read *.cp
     
-    HASHTABLE *hptr = new HASHTABLE(16,(unsigned)PathC.size()) ;
+    circuit.setHashTable( new HASHTABLE(16,(unsigned)(circuit.getPathCand().size()) ) ) ;
     //------------- Cal Original LT ----------------------------------------------------------
-    CheckOriLifeTime()  ;
-    printSetting()      ;
+    circuit.CheckOriLifeTime()  ;
+    circuit.printSetting()      ;
     //------------- Variables Declaraion -----------------------------------------------------
-    bool *  bestnode = new bool[PathC.size()] ;
-    _sInfo = new struct info() ;
+    
+    bool nosol = true ;
+    int bestdcc = 0, dccs = 0 ;
     //--------------- Main Area ---------------------------------------------------------------
-    for( int tryi = 0 ; tryi < trylimit; tryi++ )
+    for( int tryi = 0 ; tryi < circuit.getTryLimit(); tryi++ )
     {
         starttime = chrono::steady_clock::now();
 
-        printf( YELLOW "\n\n\n----------- Round : " RESET"%d/%d " YELLOW"-------------------\n" , tryi, trylimit ) ;
+        printf( YELLOW "\n\n\n----------- Round : " RESET"%d/%d " YELLOW"-------------------\n" , tryi, circuit.getTryLimit() ) ;
         //------------- [1] MDS ----------------------------------------------------------------
-        if( !ChooseVertexWithGreedyMDS( year, false, hptr )  )
+        if( !circuit.MDS( false )  )
         {
             printf( "\n ==> " RED"No Dominate Set! \n" RESET )      ;
-            ChooseVertexWithGreedyMDS( year, true , hptr ) ;
+            circuit.MDS( true ) ;
             continue    ;
         }
-        GenerateSAT("./CNF/sat.cnf", year )             ;
-        _sInfo->oridccs = CallSatAndReadReport(0)       ;
-        ChooseVertexWithGreedyMDS( year, true , hptr )  ;
-        if( !_sInfo->oridccs )
+        circuit.GenerateSAT( ) ;
+        circuit.MDS( true )    ;
+        circuit.CallSatAndReadReport(0);
+        circuit.setOriginDCCCount( circuit.CallSatAndReadReport(0) );
+        if( !circuit.getOriginDCCCount() )
         {
+            dccs = circuit.getOriginDCCCount() ;
             printf( "   ==> " RED "NO Solution\n" RESET  ) ;
             endtime = chrono::steady_clock::now();
             MDSTime = chrono::duration_cast<chrono::duration<double>>(endtime - starttime);
@@ -126,25 +86,30 @@ int main( int argc, char* argv[] )
         }
         else
         {
+            nosol = false ;
             printf( "   ==> " GREEN "Solution Exist\n" RESET  ) ;
         }
         
-           
-        //------------- [2] Add Node -------------------------------------------------------------
-        //AddNode( )                    ;
-        //------------- [3] Remove Additional DCCs --------------------------------------------------
-        RemoveAdditionalDCC( bestnode ) ;
-        //------------- [4] Reverse Current Soltion ---------------------------------------------------
-        ReverseSol( )                   ;
+        double lower = 0, upper = 0 ;
+        circuit.CalQuality( upper, lower, 0/*Q_mode*/ ) ;//Calculate quality.
         
+        if( circuit.BInv( circuit.getRBestUB(), circuit.getRBestLB(), circuit.getBestUB(), circuit.getBestLB(), upper, lower, circuit.getYear(),bestdcc,bestdcc,dccs) )
+        {
+            system("cp ./CNF/sat.cnf ./CNF/best.cnf")   ;
+        }
+        printf("Q = %f ~ %f (此次MDS解)\n", upper ,lower  )   ;
+        printf("Q = %f ~ %f (至今最好解)\n", circuit.getBestUB() ,circuit.getBestLB() ) ;
+
         endtime = chrono::steady_clock::now();
         MDSTime = chrono::duration_cast<chrono::duration<double>>(endtime - starttime);
         printf( YELLOW "---------------------------------------------\n" RESET );
         cout << "Iteration Time = " << CYAN << MDSTime.count() << RESET << endl ;
         TotalMDSTime += MDSTime ;
+
+        
     }//for(tryi)
         
-    if( _sInfo->bestup > 10 )
+    if( nosol )
     {
         printf( "NO SOLUTION! \n" );
         return 0 ;
@@ -152,18 +117,17 @@ int main( int argc, char* argv[] )
     
     //------------- PV Monte Simulation ---------------------------------------------------------
     printf( CYAN"\n\n[Info] Begin PV-Simulation.... \n" )   ;
-    printSetting()                          ;
-    printDCCLocation()                      ;
-    CallSatAndReadReport(1)                 ;
-    PV_Monte_Simulation( _sInfo->bestup, _sInfo->bestlow  ) ;
+    circuit.printSetting()                  ;
+    circuit.printDCCLocation()              ;
+    circuit.CallSatAndReadReport(1)         ;
+    circuit.PV_Monte_Simulation()           ;
     end_time = chrono::steady_clock::now()  ;
     TotalTime = chrono::duration_cast<chrono::duration<double>>( end_time - pre_time );
-    //------------- Release Memory --------------------------------------------------------------
-    release( hptr ) ;
+    
     //------------- Show Final Results ----------------------------------------------------------
     printf( CYAN"--------------Final Result------------------------------------\n") ;
-    printSetting()                              ;
-    printDCCLocation()                          ;
+    circuit.printSetting()                              ;
+    circuit.printDCCLocation()                          ;
     cout << CYAN << "C/M/S Finding Time   = " << GREEN << attackable.count() << RESET << endl ;
     cout << CYAN << "Total execution Time = " << GREEN << TotalTime.count()  << RESET << endl ;
     //RefineResult( year, true )                  ;//設為true才不會return數值.

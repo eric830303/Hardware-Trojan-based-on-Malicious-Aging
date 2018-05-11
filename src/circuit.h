@@ -24,44 +24,23 @@ using namespace std ;
 //                  Class Forward Declration                           //
 /////////////////////////////////////////////////////////////////////////
 class HASHTABLE ;
+class CIRCUIT   ;
 class GATE      ;
 class PATH      ;
 //struct dccinfo  ;
 /////////////////////////////////////////////////////////////////////////
 //                  Function Forward Declration                        //
 /////////////////////////////////////////////////////////////////////////
-void ReadCircuit( string )          ;
-void ReadPath_l( string )           ;
+
 void CalVertexWeight( )             ;
 void RemoveRDCCs( )                 ;
 void EstimateTimeEV(double )        ;
 void ReadCpInfo( string )           ;
 void PrintStatus( double )          ;
-void AdjustConnect( )               ;
-void CheckOriLifeTime( )            ;
-void GenerateSAT( string ,double  ) ;
-void printDCCLocation() ;
-void CheckPathAttackbility( )      ;
+
 void DefCandMineSafe( double, double, bool, double )            ;
-bool Vio_Check( PATH*,int,int,AGT,AGT,double,int,int,int )      ;
-bool Vio_Check( PATH*,long double,double,int,int,int)           ;
-/////////////////////////////////////////////////////////////////////////
-int RefineResult( double ,bool  )   ;
-int HashAllClockBuffer( )           ;
-int CallSatAndReadReport( int )     ;
-/////////////////////////////////////////////////////////////////////////
-bool CheckNoVio( double )           ;
-bool AnotherSol( )                  ;
-bool ChooseVertexWithGreedyMDS( double ,bool  , HASHTABLE *  )  ;
-/////////////////////////////////////////////////////////////////////////
-double Monte_PVCalQuality( double &, double &)          ;
-double Monte_CalQuality(double , double &, double &, int )      ;
-double CalPreAgingwithPV( double, int, int, double )            ;
-double CalPreAging( double, int, int, double )                  ;
-double CalQuality( double &, double &, int )                    ;
 double absff( double )                                          ;
-void   ReadVth_pv_Sv( )                                         ;
-double FindSv( double Vth_pv )                                  ;
+void   CalSv( )                                         ;
 double CalAgingRateWithVthPV( double, double )                  ;
 double CalPathAginRateWithPV( PATH *, double )                  ;
 /////////////////////////////////////////////////////////////////////////
@@ -95,9 +74,9 @@ public:
         delete exist  ;
         size = 0 ;
     }
-    unsigned CalKey() ;
-    bool Exist() ;
-    void PutNowStatus();
+    unsigned CalKey( CIRCUIT *) ;
+    bool Exist( CIRCUIT * ) ;
+    void PutNowStatus(  CIRCUIT * );
 };
 
 /////////////////////////////////////////////////////////////////////////
@@ -181,51 +160,149 @@ private:
     vector< WIRE* >     wire_list   ;
     map< string, GATE* >nametogate  ;
     map< string, WIRE* >nametowire  ;
+    HASHTABLE * _pHashTable         ;
+    
+    vector< GATE* > _vDCCGate ;//Store used DCC
+    
+    //-------- Results ------------------------------------------------
+    int bestdcc ;
+    int dccs ;
+    int oridccs  ;
+    double bestup ;
+    double bestlow;
+    double upper, lower ;
+    //-------- Graph ------------------------------------------------
+    double **EdgeA          ;
+    double **EdgeB          ;
+    double **cor            ;
+    double **ser            ;
+    double arc_thd = 0      ;
+    //-------- Aging rate --------------------------------------------
+    double Rate[15][4]      ;
+    double A, alpha, Exp    ;
+    //-------- PV ---------------------------------------------------
+    double info[5]          ;
+    double ERROR = 1.0      ;
+    double PVRange = 0.00   ;
+    
+    double convergent_year  ;
+    double VTH_CONVGNT[4]   ;//Each duty cycle correpond to one convergent Vth
+    double Sv[4]            ;//Each duty cycle correpond to one Sv
+    
+    //-------- Timing ------------------------------------------------
+    double year = 0         ;
+    double period = 0       ;
+    double tc_mgn = 0       ;
+    double PLUS = 0.0       ;
+    double tight = 1.000001 ;
+    //-------- Path ------------------------------------------------
+    vector<PATH>  _vPathAll  ;
+    vector<PATH*> _vPathCand ;
+    //-------- Setting ---------------------------------------------
+    int    Q_mode           ;
+    int    TotalTimes       ;
+    int    Threshold        ;
+    int    Ref_Times        ;
+    int    Ref_Thre         ;
+    int    Qal_Times        ;
+    int    Qal_Thre         ;
+    int    FINAL   = 0      ;
+    int    trylimit= 0      ;
+    int    reftime = 0      ;
+    int    PVtimes = 0      ;
+    bool   monte_s = false  ;
+    string filename= ""     ;
+    
+    
+    
 public:
-    CIRCUIT(string n):name(n)
+    CIRCUIT()
     {
+        bestup   = 100   ;
+        bestlow  = -100  ;
+        bestdcc  = 10000 ;
+        dccs     = 0     ;
+        oridccs  = 0    ;
+        convergent_year = year = ERROR = 0 ;
         gate_list.clear();
         wire_list.clear();
     }
-    string GetName()
-    {
-        return name;
-    }
-    void PutWire( WIRE* w)
-    {
-        wire_list.push_back(w);
-        nametowire[w->GetName()] = w;
-    }
-    void PutGate( GATE* g )
-    {
-        gate_list.push_back(g);
-        nametogate[g->GetName()] = g;
-    }
-    WIRE* GetWire(int i)
-    {
-        return wire_list[i];
-    }
-    WIRE* GetWire(string name)
-    {
-        if( nametowire.find(name) == nametowire.end() )
-        {
-            WIRE* t = new WIRE(name, PI);
-            wire_list.push_back(t)  ;
-            nametowire[name] = t    ;
-            cout << name << endl    ;
-        }
-        return nametowire[name];
-    }
-    GATE* GetGate( string name )
-    {
-        if (nametogate.find(name) == nametogate.end())	return NULL;
-        return nametogate[name];
-    }
-    GATE* GetGate( int i )
-    {
-        return gate_list[i];
-    }
+    //---- Set/Put/Read ---------------------------------------------
+    void PutWire( WIRE* ) ;
+    void PutGate( GATE* );
+    
+    void ReadTimingReport( )  ;//Rename
+    void ReadCircuit()   ;
+    bool ReadParameter( int , char*[], string & );
+    void ReadAgingData() ;
+    void ReadCpInfo();
+    
+    void setHashTable( HASHTABLE * p ){ this->_pHashTable = p ; }
+    void setBestUB( double U ){ bestup = U ; }
+    void setBestLB( double L ){ bestup = L ; }
+    void setBestDCCCount( int c ){ bestdcc = c ; }
+    void setOriginDCCCount( int c ){ oridccs  = c ; }
+    void setDCCCount(int c){ dccs = c ; }
+    void setTryLimit(int t){ trylimit = t ; }
+    void setName( string n ){ name = n ; }
+    
+    //---- Other Method (PV-related) --------------------------------
+    void    PV_Monte_Simulation(  );
+    void    GeneratePVCkt();
+    double  Monte_PVCalQuality( double &up, double &low );
+    
+    //---- Other Method (Graph) ------------------------------------
+    bool    MDS( bool puthash );
+    bool    Check_Connect(int, int,double);
+    bool    CheckNoVio( double year /* = (year+PLUS) in main.cpp */ );//Called in main.cpp for early checking.
+    double  Overlap( int );
+    void    AdjustConnect() ;
+    
+    //---- Other Method (Timing) ------------------------------------
+    void    CheckOriLifeTime();
+    bool    Vio_Check( PATH* pptr, int stn, int edn, AGT ast, AGT aed, double year );
+    bool    Vio_Check( PATH* pptr, long double year, double Aging_P, bool  );
+    double  CalQuality( double &up, double &low , int mode ) ;
+    void    CalPreInv( double, double &,double &,int,int, double);
+    double  CalPreAging( double, int, int, double);
+    double  calConvergentVth( double, double );
+    double  calSv( double, double, double );
+    double  CalPathAginRateWithPV( PATH * pptr, double year );
+    double  CalAgingRateWithVthPV( double, double );
+    double  AgingRate(AGINGTYPE status, double year);
+    //---- Other --------------------------------
+    void    PathClassify();
+    void    ReverseSol( );
+    int     HashAllClockBuffer();
+    void    RemoveRDCCs();
+    void    release( HASHTABLE *hptr );
+    void    printSetting(  );
+    void    printDCCLocation();
+    void    GenerateSAT( );
+    int     CallSatAndReadReport( int );
+    bool BInv(double &bu, double &bl, double u1, double l1, double u2, double l2,double n,int &dcb,int dc1,int dc2);
+    //----Get/Call --------------------------------------------------
+    string  GetName() ;
+    int     shortlistsize();
+    double  getBestUB(  ){ return bestup ; }
+    double  getBestLB(  ){ return bestlow  ; }
+    double & getRBestUB(  ){ return bestup ; }
+    double & getRBestLB(  ){ return bestlow  ; }
+    double  getYear( )   { return year ; }
+    int     getBestDCCCount(  ){ return bestdcc ; }
+    int     getOriginDCCCount( ){ return oridccs   ; }
+    int     getDCCCount(){ return dccs ; }
+    int     getTryLimit(){ return trylimit ; }
+    WIRE*   GetWire(int) ;
+    WIRE*   GetWire(string);
+    GATE*   GetGate(string);
+    GATE*   GetGate( int i );
+    vector<PATH>  & getPathALL() { return _vPathAll  ; }
+    vector<PATH*> & getPathCand(){ return _vPathCand ; }
+    vector<GATE*> & getDCCList() { return _vDCCGate  ; }//Store used DCC
+    HASHTABLE * getHashTable( ){ return this->_pHashTable ; }
     void PutClockSource();
+    
 };
 
 /////////////////////////////////////////////////////////////////////////

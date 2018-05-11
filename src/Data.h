@@ -21,39 +21,11 @@ class CIRCUIT   ;
 
 inline double maxf(double a, double b) ;
 inline double minf(double a, double b) ;
-bool    BInv(double&,double&,double,double,double,double,double,int&,int,int )      ;
-void    ReadParameter( int ,char*[])    ;
-void    printSetting( )                 ;
+
+
 void    release( HASHTABLE *)                                                       ;
 void    PV_show()                                                                   ;
-void    PV_Monte_Simulation( double, double )          ;
-void    ReverseSol(  )    ;
-void    RemoveAdditionalDCC( bool * ) ;
-void    AddNode( ) ;
 
-//////////////////////////////////////////////////////////////////
-//          Varaible Declaration                                //
-//////////////////////////////////////////////////////////////////
-extern double **EdgeA          ;
-extern double **EdgeB          ;
-extern double **cor            ;
-extern double **ser            ;
-extern double info[5]          ;
-extern double ERROR            ;
-extern double PVRange          ;
-extern double PLUS             ;
-extern double tight            ;
-
-//////////////////////////////////////////////////////////////////
-extern vector<PATH>  PathR     ;
-extern vector<PATH*> PathC     ;
-extern vector<PATH*> _vPathC   ;
-extern vector<CIRCUIT> Circuit ;
-//////////////////////////////////////////////////////////////////
-extern int    TotalTimes       ;
-extern int    Threshold        ;
-extern string fname            ;
-//////////////////////////////////////////////////////////////////
 
 //--------------- Quality for Each Instance ----------------------
 struct PVdata
@@ -72,15 +44,7 @@ struct PVdata
     void        sdist( double d ) { dist  = d   ; }
 };
 
-//--------------- Info for Each Dots ------------------------------
-struct worse
-{
-    worse( PATH *pi ,PATH *pj, double d ):_pPi(pi),_pPj(pj),_DijDelta(d)
-    {}
-    PATH* _pPi ;
-    PATH* _pPj ;
-    double _DijDelta ;
-};
+
 
 //--------------- Info for DP --------------------------------------
 struct dccinfo
@@ -104,36 +68,6 @@ struct dccinfo
     void pv_posf( bool pv_posf ){ if( !(this->posfail) && ( pv_posf ) ){ this->pv_posfail++ ; } }
     void pv_midd( bool pv_midd ){ if( !(this->middle ) && ( pv_midd ) ){ this->pv_middle++  ; } }
 };
-
-struct info
-{
-    int bestdcc ;
-    int dccs ;
-    int oridccs  ;
-    double bestup ;
-    double bestlow;
-    double upper, lower ;
-    info()
-    {
-        bestup   = 100   ;
-        bestlow  = -100  ;
-        bestdcc  = 10000 ;
-        dccs     = 0     ;
-        oridccs  = 0    ;
-    }
-};
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

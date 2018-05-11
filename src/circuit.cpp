@@ -13,46 +13,71 @@
 //////////////////////////////////////////////////////////////////
 //          Varaible Declaration                                //
 //////////////////////////////////////////////////////////////////
-extern vector< CIRCUIT >    Circuit ;
-extern vector< PATH >       PathR   ;
-extern vector< PATH* >      PathC   ;
-extern vector< PATH* >      _vPathC ;
 //////////////////////////////////////////////////////////////////
-extern double **EdgeA   ;
-extern double **EdgeB   ;
-extern double **cor     ;
-extern double **ser     ;
-extern double info[5]   ;
-extern double ERROR     ;
-extern double PVRange   ;
-extern double PLUS      ;
-extern double tight     ;
-extern double year      ;
-extern double tc_mgn    ;
-//////////////////////////////////////////////////////////////////
-extern int TotalTimes   ;
-extern int Threshold    ;
-extern int R_Times      ;
-extern int R_Thre       ;
-extern int L_Times      ;
-extern int L_Thre       ;
-extern int Ref_Times    ;
-extern int Ref_Thre     ;
-extern int Qal_Times    ;
-extern int Qal_Thre     ;
-extern int Q_mode       ;
-extern bool   Q_Monte   ;
-extern map< double, double>pvtoSv  ;
-//////////////////////////////////////////////////////////////////
-extern string fname     ;
-//////////////////////////////////////////////////////////////////
-extern double period    ;
-double _pvPeriod        ;
 
-vector< GATE* > _vDCCGate ;
+
 //////////////////////////////////////////////////////////////////
 //          Function Declaration                                //
 //////////////////////////////////////////////////////////////////
+double CIRCUIT::AgingRate(AGINGTYPE status, double year)
+{
+    
+    double second = year * 365 * 86400;    //0.0039*(0.5*t)^0.2 + 1    average case -> worst caseßY•h±º0.5(alpha)
+    int y = year;
+    if( year > 10 )//DCC使用內插法計算老化率
+    {
+        switch (status)
+        {
+            case DCC_M:
+                return (Rate[10][1] - Rate[9][1]) *(year - 10) + Rate[10][1];
+            case DCC_NONE:
+                return (Rate[10][3] - Rate[9][3]) *(year - 10) + Rate[10][3];
+            case DCC_F:
+                return (Rate[10][2] - Rate[9][2]) *(year - 10) + Rate[10][2];
+            case DCC_S:
+                return (Rate[10][0] - Rate[9][0]) *(year - 10) + Rate[10][0];
+            case FF:
+                return 0.02*year ;//F-F是假設每年老化率增加2%
+            case WORST:
+                return (this->A)*pow( (this->alpha)*second, this->Exp );
+            case NORMAL:
+                return (this->A)*pow( (this->alpha)*second, this->Exp );
+            case BEST:
+                return (this->A)*pow( 0.25*second, this->Exp );
+            default:
+                return (this->A)*pow( (this->alpha)*second, this->Exp );
+        }
+    }
+    switch (status)
+    {
+        case DCC_M:
+            if (year - (double)y > 0.00001)
+                return (Rate[y + 1][1] - Rate[y][1]) *(year - (double)y) + Rate[y][1];
+            return Rate[y][1];
+        case DCC_NONE:
+            if (year - (double)y > 0.00001)
+                return (Rate[y + 1][3] - Rate[y][3]) *(year - (double)y) + Rate[y][3];
+            return Rate[y][3];
+        case DCC_F:
+            if (year - (double)y > 0.00001)
+                return (Rate[y + 1][2] - Rate[y][2]) *(year - (double)y) + Rate[y][2];
+            return Rate[y][2];
+        case DCC_S:
+            if (year - (double)y > 0.00001)
+                return (Rate[y + 1][0] - Rate[y][0]) *(year - (double)y) + Rate[y][0];
+            return Rate[y][0];
+        case FF:
+            return 0.02*year;
+        case WORST:
+            return (this->A)*pow( (this->alpha)*second, this->Exp );
+        case NORMAL:
+            return (this->A)*pow( (this->alpha)*second, this->Exp );
+        case BEST:
+            return (this->A)*pow( 0.25*second, this->Exp );;
+        default:
+            return (this->A)*pow( (this->alpha)*second, this->Exp );
+    }
+}
 
 double absff(double x)
 {
@@ -87,15 +112,71 @@ void CIRCUIT::PutClockSource()
     gptr->SetOutTime(0);
     PutGate(gptr);
 }
+string CIRCUIT::GetName(){   return name;    }
+void CIRCUIT::PutWire( WIRE* w)
+{
+    wire_list.push_back(w);
+    nametowire[w->GetName()] = w;
+}
+void CIRCUIT::PutGate( GATE* g )
+{
+    gate_list.push_back(g);
+    nametogate[g->GetName()] = g;
+}
+WIRE* CIRCUIT::GetWire(int i)
+{
+    return wire_list[i];
+}
+WIRE* CIRCUIT::GetWire(string name)
+{
+    if( nametowire.find(name) == nametowire.end() )
+    {
+        WIRE* t = new WIRE(name, PI);
+        wire_list.push_back(t)  ;
+        nametowire[name] = t    ;
+        cout << name << endl    ;
+    }
+    return nametowire[name];
+}
+GATE* CIRCUIT::GetGate( string name )
+{
+    if (nametogate.find(name) == nametogate.end())    return NULL;
+    return nametogate[name];
+}
+GATE* CIRCUIT::GetGate( int i )
+{
+    return gate_list[i];
+}
+
+void CIRCUIT::ReadAgingData(){
+    fstream file;
+    file.open("./parameter/AgingRate.txt");
+    
+    for( int i = 0 ; i < 15 ; i++)
+    {
+        for( int k = 0 ; k < 4 ; k++ )  Rate[i][k] = 0 ;
+    }
+    for (int i = 1; i <=5; i++)
+    {
+        file >> Rate[i][0] >> Rate[i][1] >> Rate[i][2] >> Rate[i][3];
+    }
+    file >> Rate[10][0] >> Rate[10][1] >> Rate[10][2] >> Rate[10][3];
+    for (int i = 6; i < 10; i++)
+        for (int j = 0; j < 4;j++)
+            Rate[i][j] = (Rate[10][j] - Rate[5][j]) / 5 * (i - 5) + Rate[5][j];
+    file.close();
+}
 //////////////////////////////////////////////////////////////////
 //             Read Netlist                                     //
 //////////////////////////////////////////////////////////////////
-void ReadCircuit( string filename )
+void CIRCUIT::ReadCircuit()
 {
-    string vgname = "./benchmark/" + filename + ".vg"  ;
+    string vgname = "./benchmark/" + this->filename + ".vg"  ;
     printf( CYAN"[Info] Reading Circuit...\n");
     fstream file;
     file.open(vgname.c_str(),ios::in);
+    
+    if(!file){ cerr << "benchmark do not exist!\n"; return ;}
     char temp[1000]     ;
     bool cmt = false    ;
     int Nowmodule = -1  ;
@@ -103,6 +184,7 @@ void ReadCircuit( string filename )
     while (file.getline(temp, 1000))//一行多個命令無法處理
     {
         string temps = temp;
+        
         if( cmt )
         {
             if (temps.find("*/") != string::npos)
@@ -130,8 +212,10 @@ void ReadCircuit( string filename )
         else if (temps.find("module")!=string::npos)
         {
             unsigned long st = temps.find("module") + 7;
-            CIRCUIT TC(temps.substr(st, temps.find(" (") - st));
-            Circuit.push_back(TC);
+            //CIRCUIT TC(temps.substr(st, temps.find(" (") - st));
+            //Circuit.push_back(TC);
+            this->setName(temps.substr(st, temps.find(" (") - st));
+            
             Nowmodule++;
             while (file.getline(temp, 1000)){
                 temps = temp;
@@ -143,20 +227,23 @@ void ReadCircuit( string filename )
         {
             unsigned long st = temps.find("input") + 6;
             WIRE* w = new WIRE(temps.substr(st,temps.find(";") - st),PI);
-            Circuit[Nowmodule].PutWire(w);
+            //Circuit[Nowmodule].PutWire(w);
+            this->PutWire(w);
         }
         else if (temps.find("output") != string::npos)
         {
             unsigned long st = temps.find("output") + 7;
             WIRE* w = new WIRE(temps.substr(st, temps.find(";") - st), PO);
-            Circuit[Nowmodule].PutWire(w);
+            //Circuit[Nowmodule].PutWire(w);
+            this->PutWire(w);
             
         }
         else if (temps.find("wire") != string::npos)
         {
             unsigned long st = temps.find("wire") + 5;
             WIRE* w = new WIRE(temps.substr(st, temps.find(";") - st), INN);
-            Circuit[Nowmodule].PutWire(w);
+            //Circuit[Nowmodule].PutWire(w);
+            this->PutWire(w);
         }
         else
         {
@@ -165,7 +252,7 @@ void ReadCircuit( string filename )
             bool ok = false;
             for (int i = 0; i < Nowmodule; i++)
             {
-                if (Circuit[i].GetName() == temps.substr(0, temps.find(" "))){
+                if ( this->GetName() == temps.substr(0, temps.find(" "))){
                     //可能再加入藉由之前讀入的module(非library)來建立gate,in/output的名稱不用記錄(在module內有),但要用以接到正確接口
                     ok = true;
                     break;
@@ -180,8 +267,8 @@ void ReadCircuit( string filename )
                 GATE* g = new GATE(gateN,moduleN);
                 unsigned long st = temps.find("(") ;
                 string ioN = temps.substr(st + 1, temps.find(")") - st - 1);
-                g->SetOutput(Circuit[Nowmodule].GetWire(ioN));
-                Circuit[Nowmodule].GetWire(ioN)->SetInput(g);
+                g->SetOutput(this->GetWire(ioN));
+                this->GetWire(ioN)->SetInput(g);
                 temps = temps.substr(temps.find(")") + 1);
                 
                 while (file.getline(temp,1000))//gate's input 會在後面每行寫一個
@@ -189,23 +276,25 @@ void ReadCircuit( string filename )
                     temps = temp;
                     st = temps.find("(");
                     string ioN = temps.substr(st + 1, temps.find(")") - st - 1);		//會有線接到1'b1,1'b0(常數)
-                    g->SetInput(Circuit[Nowmodule].GetWire(ioN));
-                    Circuit[Nowmodule].GetWire(ioN)->SetOutput(g);
+                    g->SetInput(this->GetWire(ioN));
+                    this->GetWire(ioN)->SetOutput(g);
                     //temps = temps.substr(temps.find(")") + 1);
                     if (temps.find(";") != string::npos)	break;
                 }
-                Circuit[Nowmodule].PutGate(g);
+                this->PutGate(g);
             }
         }
     }
     file.close();
+    cout << wire_list.size() << endl ;
+    cout << gate_list.size() << endl ;
     printf( CYAN"   ==> Finish Reading Circuit\n");
     return;
 }
 //////////////////////////////////////////////////////////////////
 //          Read Timing Report(*.rpt)                           //
 //////////////////////////////////////////////////////////////////
-void ReadPath_l( string filename )
+void CIRCUIT::ReadTimingReport( )
 {
     string rptname = "./benchmark/" + filename + ".rpt"  ;
     printf( CYAN"[Info] Reading Cirtical Paths Info...\n") ;
@@ -217,16 +306,23 @@ void ReadPath_l( string filename )
     PATH*   p = NULL;
     unsigned Path_No = 0;
     file.open( rptname.c_str(), ios::in);
+    if( !file )
+    {
+        cerr << "Cannot opern rpt file" << endl ;
+        return ;
+    }
+    
+    
     while( getline(file, line) )
     {
         if( line.find("Startpoint") != string::npos )
         {
-            if (PathR.size() >= MAXPATHS )
+            if ( this->getPathALL().size() >= MAXPATHS )
                 return;
             p = new PATH();
             sp = line.substr(line.find("Startpoint") + 12);
             sp = sp.substr(0, sp.find(" "));
-            spptr = Circuit[0].GetGate(sp);	//0為top-module
+            spptr = this->GetGate(sp);	//0為top-module
             if (spptr == NULL)	//起點為PI
                 spptr = new GATE(sp,"PI");
         }
@@ -234,7 +330,7 @@ void ReadPath_l( string filename )
         {
             ep = line.substr(line.find("Endpoint") + 10);
             ep = ep.substr(0, ep.find(" "));
-            epptr = Circuit[0].GetGate(ep);
+            epptr = this->GetGate(ep);
             if (epptr == NULL)
                 epptr = new GATE(ep, "PO");
         }
@@ -258,7 +354,7 @@ void ReadPath_l( string filename )
                 if (line.find("(net)") != string::npos)	continue;
                 else if (line.find("(in)") != string::npos)
                 {	//PI時間不計,如果有外部延遲後面分析再加入
-                    spptr->SetClockPath(Circuit[0].GetGate("ClockSource"));
+                    spptr->SetClockPath(this->GetGate("ClockSource"));
                 }//else if (line.find("(out)") != string::npos){}
                 else
                 {
@@ -266,7 +362,7 @@ void ReadPath_l( string filename )
                     double intime = TransStringToDouble(line.substr(line.find("&") + 1));
                     getline(file, line);
                     double outtime = TransStringToDouble(line.substr(line.find("&") + 1));
-                    gptr = Circuit[0].GetGate(name) ;
+                    gptr = this->GetGate(name) ;
                     spptr->SetClockPath(gptr)       ;
                     gptr->SetInTime(intime)         ;
                     gptr->SetOutTime(outtime)       ;
@@ -290,7 +386,7 @@ void ReadPath_l( string filename )
             double intime = TransStringToDouble(line.substr(line.find("&") + 1));
             getline(file, line);
             double outtime = TransStringToDouble(line.substr(line.find("&") + 1));
-            gptr = Circuit[0].GetGate(name);
+            gptr = this->GetGate(name);
             p->AddGate( gptr, intime, outtime, gptr->PV );
             
         } while ( getline(file, line) ) ;
@@ -328,7 +424,7 @@ void ReadPath_l( string filename )
                     continue ;
                 else if( line.find("(in)") != string::npos )
                 {
-                    epptr->SetClockPath(Circuit[0].GetGate("ClockSource"));
+                    epptr->SetClockPath(this->GetGate("ClockSource"));
                 }
                 else
                 {
@@ -336,7 +432,7 @@ void ReadPath_l( string filename )
                     double intime = TransStringToDouble(line.substr(line.find("&") + 1));
                     getline(file, line);
                     double outtime = TransStringToDouble(line.substr(line.find("&") + 1));
-                    gptr = Circuit[0].GetGate(name);
+                    gptr = this->GetGate(name);
                     epptr->SetClockPath(gptr);
                     gptr->SetInTime(intime - period);		//檔案中為source -> ff的時間 + 1個period 需消去
                     gptr->SetOutTime(outtime - period);
@@ -352,14 +448,15 @@ void ReadPath_l( string filename )
         p->SetType(LONG);
         p->SetNo(Path_No++);
         if (p->length()>2)		//中間有gate 不是直接連
-            PathR.push_back(*p);
+            this->getPathALL().push_back(*p);
         sp = "";
     }
     printf( CYAN"   ==> Finish Reading Critical Paths info\n");
+    printf( CYAN"   ==> Path count = %ld \n", getPathALL().size());
     file.close();
 }
 
-void ReadCpInfo( string filename  )//讀關聯性和迴歸線
+void CIRCUIT::ReadCpInfo( )//讀關聯性和迴歸線
 {
     fstream file ;
     string cpname = "./benchmark/" +filename + ".cp" ;
@@ -369,7 +466,7 @@ void ReadCpInfo( string filename  )//讀關聯性和迴歸線
         printf(" Can't Open *.cp file\n");
     }
     map< unsigned, unsigned > mapping ;	//原編號(沒有去掉PI->PO & NO_GATE的) -> PathC的編號
-    unsigned long ss = PathC.size() ;
+    unsigned long ss = this->getPathCand().size() ;
     
     EdgeA = new double  *[ss]   ;
     EdgeB = new double  *[ss]   ;
@@ -382,9 +479,9 @@ void ReadCpInfo( string filename  )//讀關聯性和迴歸線
         cor[i] = new double[ss];
         ser[i] = new double[ss];
     }
-    for(int i = 0; i < PathC.size(); i++)
+    for(int i = 0; i < this->getPathCand().size(); i++)
     {
-        mapping[PathC[i]->No()] = i ;
+        mapping[this->getPathCand().at(i)->No()] = i ;
     }
     
     int     im = 0, jn = 0                  ;
@@ -425,168 +522,44 @@ void ReadCpInfo( string filename  )//讀關聯性和迴歸線
     file.close();
 }
 
-void CalPreInv(
+void CIRCUIT::CalPreInv(
                double x        ,//老化率 ex: x=0.14
                double &upper   ,//a推到b後，得到b的最大老化率
                double &lower   ,//a推到b後，得到b的最小老化率
-               int a, int b, double year
+               int a, int b, double aged_year
                )
 {
-    if (EdgeA[a][b] > 9999)
+    if( EdgeA[a][b] > 9999 )
     {
         upper = lower = 10000;
         return;
     }
     double dis = 1.96;	//+-多少個標準差 90% 1.65 ,95% 1.96 ,99% 2.58
-    double y1 = EdgeA[a][b] * (x + 1) + EdgeB[a][b] * ((1 + AgingRate(WORST, year)) / (1 + AgingRate(WORST, 10)));
-    upper = y1 + ser[a][b] * dis* ((1 + AgingRate(WORST, year)) / (1 + AgingRate(WORST, 10))) - 1   ;
-    lower = y1 - ser[a][b] * dis* ((1 + AgingRate(WORST, year)) / (1 + AgingRate(WORST, 10))) - 1   ;//按照比例調整
+    double y1 = EdgeA[a][b] * (x + 1) + EdgeB[a][b] * ((1 + AgingRate(WORST, aged_year)) / (1 + AgingRate(WORST, 10)));
+    upper = y1 + ser[a][b] * dis* ((1 + AgingRate(WORST, aged_year)) / (1 + AgingRate(WORST, 10))) - 1   ;
+    lower = y1 - ser[a][b] * dis* ((1 + AgingRate(WORST, aged_year)) / (1 + AgingRate(WORST, 10))) - 1   ;//按照比例調整
     //注意，此時y1,upper,lower單位是"老化率"，而非"年份"
     //cp檔是以"10"年為基準下做的，所以y=ax+b中的b需要微調
 }
 
-double CalPreAging( double x, int a, int b, double year )//計算預測值，跟上面相比，直接計算y=ax+b，而不計算誤差
+double CIRCUIT::CalPreAging( double x, int a, int b, double aged_year )//計算預測值，跟上面相比，直接計算y=ax+b，而不計算誤差
 {
     if( EdgeA[a][b] > 9999 )
         return 10000;
-    return EdgeA[a][b] * (x + 1) + EdgeB[a][b] * ((1 + AgingRate(WORST, year)) / (1 + AgingRate(WORST, 10))) - 1;		//按照比例調整
+    return EdgeA[a][b] * (x + 1) + EdgeB[a][b] * ((1 + AgingRate(WORST, aged_year)) / (1 + AgingRate(WORST, 10))) - 1;		//按照比例調整
 }
-/*
-double CalPreAgingwithPV( double x, int a, int b, double year )
-{
-    if( _pEdgeA[a][b] > 9999 )
-        return 10000;
-    return _pEdgeA[a][b] * (x + 1) + _pEdgeB[a][b] * ((1 + AgingRate(WORST, year)) / (1 + AgingRate(WORST, 10))) - 1;
-}
- */
 
-////////////////////////////////////////////////////////////////////////////////////////////////
-//          Parallels Region - Argument                                                       //
-////////////////////////////////////////////////////////////////////////////////////////////////
-typedef struct thd_data
-{
-    thd_data( int id,PATH*p,int t,int c,double y,double cs,double ct,double dij,double tq,double pd):thd_id(id),ptr(p),times(t),counter(c),year(y),clks(cs),clkt(ct),Dij(dij),Tcq(tq),period(pd)
-    {   }
-    int thd_id     = 0         ;
-    PATH*  ptr     = NULL      ;
-    int    times   = 0         ;
-    int    counter = 0         ;
-    int    type    = 0         ;
-    double year    = 0         ;
-    double clks    = 0         ;
-    double clkt    = 0         ;
-    double Tcq     = 0         ;
-    double Dij     = 0         ;
-    double period  = 0         ;
-}thd_data ;
-////////////////////////////////////////////////////////////////////////////////////////////////
-//          Parallels Region - Function                                                       //
-////////////////////////////////////////////////////////////////////////////////////////////////
-void *parallel_compare( void * data   )
-{
-    thd_data * mydata = ( thd_data * ) data ;
-    PATH *pptr = mydata->ptr ;
-    int counter = 0          ;
-    for( int k = 0 ; k < mydata->times ; k++ )
-    {
-        double DelayP = pptr->GetFreshDij() ;
-        //-------------------- Local PV Instance -----------------------------------
-        for( int i = 1 ; i < pptr->length()-1 ; i++ )
-        {
-            double U = rand() / (double)RAND_MAX;
-            double V = rand() / (double)RAND_MAX;
-            double Z = sqrt(-2 * log(U))*cos(2 * 3.14159265354*V) ;//常態分佈的隨機
-            double Vth_pv =  Z*PVRange ;
-            double AgeRate_ttl = CalAgingRateWithVthPV( Vth_pv, mydata->year ) ;//Consider PV & NBTI
-            DelayP += AgeRate_ttl*( pptr->Out_time(i) - pptr->In_time(i) ) ;//DelayP ++ delta
-        }
-        //-------------------- Violate Or Not ? -------------------------------------
-        if( mydata->type == 3 )//-->
-        {
-            if ( pptr->GetType() == LONG )//Setup time Violation Check
-            {
-                if( mydata->clks + mydata->Tcq + DelayP < mydata->clkt - pptr->GetST() + period ){  counter++ ; }
-            }
-            else//Hold time Violation Check
-            {
-                if( mydata->clks + mydata->Tcq + DelayP > mydata->clkt + pptr->GetHT() )         {  counter++ ; }
-            }
-        }
-        else
-        {
-            if ( pptr->GetType() == LONG )//Setup time Violation Check
-            {
-                if( mydata->clks + mydata->Tcq + DelayP > mydata->clkt - pptr->GetST() + period ){  counter++ ; }
-            }
-            else//Hold time Violation Check
-            {
-                if( mydata->clks + mydata->Tcq + DelayP < mydata-> clkt + pptr->GetHT() )        {  counter++ ; }
-            }
-        }
-    }//for(k)
-    mydata->counter = counter  ;
-    pthread_exit( NULL ) ;
-}
-////////////////////////////////////////////////////////////////////////////////////////////////
-//          Read "Vth_pv_Sv.txt"                                                              //
-//      Note: The unit of number in the function is V instead of mV                           //
-////////////////////////////////////////////////////////////////////////////////////////////////
-void ReadVth_pv_Sv( )
-{
-    ifstream token( "Vth_pv_Sv.txt" );
-    double Vth_pv, Sv ;
-    while( token >> Vth_pv >> Sv )
-    {
-        pvtoSv.insert( pair<double,double>(Vth_pv, Sv) ) ;
-    }
-}
-////////////////////////////////////////////////////////////////////////////////////////////////
-//          Lookup Table of Sv with Vth_pv                                                    //
-//      Note: The unit of number in the function is V instead of mV                           //
-////////////////////////////////////////////////////////////////////////////////////////////////
-double FindSv( double Vth_pv )
-{
-    double Sv = 0 ;
-    auto it = pvtoSv.find( Vth_pv ) ;
-    if( it != pvtoSv.end() )
-    {   return it->second  ; }
-    else
-    {
-        if( Vth_pv < -0.02 )    return 9.90 ;
-        else if( Vth_pv > 0.02 )return 10.57;
-        else if( Vth_pv == 0 )  return 0    ;
-        else
-        {
-            double flor = floor( Vth_pv*10000 )/10000 ;
-            double cel  = ceil( Vth_pv*10000 )/10000 ;
 
-            //###------------- Interpolation Method ------------------------------------------
-            auto it_cel  = pvtoSv.find( cel  ) ;
-            auto it_flor = pvtoSv.find( flor ) ;
-            
-            double Sv_cel = 0     ;
-            double Sv_flor= 0     ;
-            if( cel != 0 )  Sv_cel = it_cel->second  ;
-            else            Sv_cel = -200 ;
-            if( flor != 0 ) Sv_flor= it_flor->second    ;
-            else            Sv_flor = 200 ;
-            double m = (Sv_cel-Sv_flor)/(cel-flor);
-            Sv = Sv_flor + (m)*(Vth_pv-flor) ;
-
-            return Sv ;
-        }
-    }
-    return Sv ;
-}
 ////////////////////////////////////////////////////////////////////////////////////////////////
 //          Cal Aging rate considering PV on Vth                                              //
 //      Note: The unit of number in the function is V instead of mV                           //
 ////////////////////////////////////////////////////////////////////////////////////////////////
-double CalAgingRateWithVthPV( double Vth_pv, double year )
+double CIRCUIT::CalAgingRateWithVthPV( double Vth_pv, double aged_year )
 {
-    double Sv = FindSv( Vth_pv ) ;
-    double Vth_nbti = ( 1 - Sv*Vth_pv )*(0.0039/2)*pow( (0.5*year*365*86400), 0.2 ) ;
+    double Vth_nbti = ( 1 - Sv[2]*Vth_pv )*(0.0039/2)*pow( (0.5*aged_year*365*86400), 0.2 ) ;
     double Vth_ttl = Vth_nbti + Vth_pv ;
+    
+    //printf("Vth_pv = %f, Agr = %f, gain = %f \n", Vth_pv, 2*Vth_nbti, 2*Vth_ttl);
     return 2*Vth_ttl ;
 }
 
@@ -597,7 +570,7 @@ double CalAgingRateWithVthPV( double Vth_pv, double year )
 //      mode 3 : PV Verifcation(向右嚴格)                                                       //
 //      mode 4 : PV Verifcation(向左嚴格)                                                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////
-bool Vio_Check( PATH* pptr, int stn, int edn, AGT ast, AGT aed, double year, int mode,int thre,int run )
+bool CIRCUIT::Vio_Check( PATH* pptr, int stn, int edn, AGT ast, AGT aed, double year )
 {
     GATE* stptr = pptr->Gate(0);
     GATE* edptr = pptr->Gate(pptr->length() - 1);
@@ -688,80 +661,21 @@ bool Vio_Check( PATH* pptr, int stn, int edn, AGT ast, AGT aed, double year, int
     if( stptr->GetType() != "PI" )
         Tcq *= ( AgingRate(FF, year) + 1.0) ;
     
-    double Dij =  pptr->GetFreshDij() ;
     
-    if( mode <= 1 )
+    double DelayP = pptr->GetFreshDij() ; ;
+    //##----------------- DelayP using different Aging Model -----------------------------------------
+    DelayP += DelayP*AgingRate( NORMAL, year );
+    
+    //##------------------ Set/Hold Timing Constraint -----------------------------------------
+    if( pptr->GetType() == LONG )
     {
-        double DelayP = Dij ;
-        //##----------------- DelayP using different Aging Model -----------------------------------------
-        if( mode == 0 )
-            DelayP += DelayP*AgingRate( NORMAL, year );
-        else
-        {
-            double Vth_pv    = 0 ;
-            double AgRate    = 0 ;
-            double Gate_DN_Delay = 0 ;//Design
-            double Gate_PV_Delay = 0 ;//PV
-            for( int i = 0 ; i < pptr->length()-1 ; i++ )
-            {
-                Gate_DN_Delay = ( pptr->Out_time(i) - pptr->In_time(i) ) ;//Design delay
-                Vth_pv = pptr->gTiming(i)->pv()                 ;
-                Gate_PV_Delay = Gate_DN_Delay*( Vth_pv*2 )      ;
-                AgRate = CalAgingRateWithVthPV( Vth_pv, year )  ;
-                DelayP += ( Gate_DN_Delay + Gate_PV_Delay )*AgRate ;
-            }
-        }
-        //##------------------ Set/Hold Timing Constraint -----------------------------------------
-        if( pptr->GetType() == LONG )
-        {
-            if (clks + Tcq + DelayP < clkt - pptr->GetST() + period )   return true     ;
-            else                                                        return false    ;//Violate!
-        }
-        else
-        {
-            if( clks + Tcq + DelayP > clkt + pptr->GetHT())             return true     ;
-            else                                                        return false    ;//Violate!
-        }
+        if (clks + Tcq + DelayP < clkt - pptr->GetST() + period )   { return true     ; }
+        else                                                        { return false    ;}//Violate!
     }
-    else if( mode == 3 )//PV verification(-->)
+    else
     {
-        int times = run        ;
-        int thd = thre         ;
-        int counter = 0        ;
-        pthread_t thrd[thdnum] ;
-        thd_data *arg[thdnum]  ;
-        
-        for( int tid = 0 ; tid < thdnum ; tid++ )
-        {
-            arg[tid] = new thd_data(tid,pptr,times,0,year,clks,clkt,Dij,Tcq,period) ;
-            arg[tid]->type = 3 ;
-            pthread_create( &thrd[tid], NULL, parallel_compare , (void*)arg[tid] ) ;
-        }
-        for( int tid = 0 ; tid < thdnum ; tid++ ){  pthread_join( thrd[tid], NULL ) ;   }
-        for( int tid = 0 ; tid < thdnum ; tid++ ){  counter += arg[tid]->counter    ;   }
-        if( counter >= thd ){   return true     ;   }//Not Violate
-        else                {   return false    ;   }
-        
-    }
-    else //PV verification(<---)
-    {
-        int times = run              ;
-        int thd =   thre             ;
-        int counter = 0              ;
-        pthread_t thrd[thdnum]       ;
-        thd_data *arg[thdnum]        ;
-        
-        for( int tid = 0 ; tid < thdnum ; tid++ )
-        {
-            arg[tid] = new struct thd_data(tid,pptr,times,0,year,clks,clkt,Dij,Tcq,period) ;
-            arg[tid]->type = 4 ;
-            pthread_create( &thrd[tid], NULL, parallel_compare , (void*)arg[tid] ) ;
-        }
-        for( int tid = 0 ; tid < thdnum ; tid++ ){  pthread_join( thrd[tid], NULL ) ;   }
-        for( int tid = 0 ; tid < thdnum ; tid++ ){  counter += arg[tid]->counter    ;   }
-        if( counter >= thd ){   return false    ;   }//Violate
-        else                {   return true     ;   }
-        
+        if( clks + Tcq + DelayP > clkt + pptr->GetHT())             return true     ;
+        else                                                        return false    ;//Violate!
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -769,7 +683,7 @@ bool Vio_Check( PATH* pptr, int stn, int edn, AGT ast, AGT aed, double year, int
 //      mode 0 : Exclude PV                                                                   //
 //      mode 1 : Include PV                                                                   //
 ////////////////////////////////////////////////////////////////////////////////////////////////
-bool Vio_Check( PATH* pptr, long double year, double Aging_P , int mode, int thre , int runtime )
+bool CIRCUIT::Vio_Check( PATH* pptr, long double year, double Aging_P, bool mode  )
 {
     
     GATE* stptr = pptr->Gate(0)                 ;
@@ -869,56 +783,36 @@ bool Vio_Check( PATH* pptr, long double year, double Aging_P , int mode, int thr
     if (stptr->GetType() != "PI")
         Tcq *= (AgingRate(FF, year) + 1.0);
     
-    //--------------------Comb Ckt's Timing Delay(Plus Aging)------------------------------------------
-    double DelayP =  pptr->GetFreshDij();
-    if( mode <= 1 )
-    {
+    double Dij =  pptr->GetFreshDij() ;
+    double DelayP = Dij ;
         //##----------------- DelayP using different Aging Model -----------------------------------------
-        if( mode == 0 )
-            DelayP += DelayP*Aging_P;
-        else
+    if( mode == 0 )
+        DelayP += DelayP*Aging_P;
+    else
+    {
+        double Vth_pv    = 0 ;
+        double AgRate    = 0 ;
+        double Gate_DN_Delay = 0 ;//Design
+        double Gate_PV_Delay = 0 ;//PV
+        for( int i = 0 ; i < pptr->length()-1 ; i++ )
         {
-            double Vth_pv    = 0 ;
-            double AgRate    = 0 ;
-            double Gate_DN_Delay = 0 ;//Design
-            double Gate_PV_Delay = 0 ;//PV
-            for( int i = 0 ; i < pptr->length()-1 ; i++ )
-            {
-                Gate_DN_Delay = ( pptr->Out_time(i) - pptr->In_time(i) ) ;//Design delay
-                Vth_pv = pptr->gTiming(i)->pv()                 ;
-                Gate_PV_Delay = Gate_DN_Delay*( Vth_pv*2 )      ;
-                AgRate = CalAgingRateWithVthPV( Vth_pv, year )  ;
-                DelayP += ( Gate_DN_Delay + Gate_PV_Delay )*AgRate ;
-            }
-        }
-        //----------------- DelayP using different Aging Model -----------------------------------------
-        
-        if( pptr->GetType() == LONG )
-        {
-            if( clks + Tcq + DelayP < clkt - pptr->GetST() + period )    return true  ;
-            else                                                         return false ;//Violate
-        }
-        else{
-            if( clks + Tcq + DelayP > clkt + pptr->GetHT() )    return true     ;
-            else                                                return false    ;//Violate
+            Gate_DN_Delay = ( pptr->Out_time(i) - pptr->In_time(i) ) ;//Design delay
+            Vth_pv = pptr->gTiming(i)->pv()                 ;
+            Gate_PV_Delay = Gate_DN_Delay*( Vth_pv*2 )      ;
+            AgRate = CalAgingRateWithVthPV( Vth_pv, year )  ;
+            DelayP += ( Gate_DN_Delay + Gate_PV_Delay )*AgRate ;
         }
     }
-    else{
-        int times = runtime          ;
-        int thd = thre               ;
-        int counter = 0              ;
-        pthread_t thrd[thdnum]       ;
-        thd_data *arg[thdnum]        ;
-        
-        for( int tid = 0 ; tid < thdnum ; tid++ ){
-            arg[tid] = new struct thd_data(tid,pptr,times,0,year,clks,clkt,DelayP,Tcq,period) ;
-            arg[tid]->type = 3 ;
-            pthread_create( &thrd[tid], NULL, parallel_compare , (void*)arg[tid]  ) ;
-        }
-        for( int tid = 0 ; tid < thdnum ; tid++ ){  pthread_join( thrd[tid], NULL ) ;   }
-        for( int tid = 0 ; tid < thdnum ; tid++ ){  counter += arg[tid]->counter    ;   }
-        if( counter >= thd ){   return true     ;   }//Not Violate
-        else                {   return false    ;   }
+    //##------------------ Set/Hold Timing Constraint -----------------------------------------
+    if( pptr->GetType() == LONG )
+    {
+        if (clks + Tcq + DelayP < clkt - pptr->GetST() + period )   return true     ;
+        else                                                        return false    ;//Violate!
+    }
+    else
+    {
+        if( clks + Tcq + DelayP > clkt + pptr->GetHT())             return true     ;
+        else                                                        return false    ;//Violate!
     }
 }
 
@@ -933,10 +827,10 @@ inline double absl(double x)
 double thershold = 0.8;	//R平方
 double errlimit = 0.01;	//老化差(改名一下)
 
-void AdjustConnect()//讀以上兩個值
+void CIRCUIT::AdjustConnect()//讀以上兩個值
 {
     fstream ff;
-    ff.open("Parameter.txt", ios::in);
+    ff.open("./parameter/Parameter.txt", ios::in);
     string line;
     while (getline(ff, line))
     {
@@ -952,7 +846,7 @@ void AdjustConnect()//讀以上兩個值
     ff.close();
 }
 
-bool Check_Connect(int a, int b,double year)
+bool CIRCUIT::Check_Connect(int a, int b,double year)
 {
     if ( EdgeA[a][b] > 9999 || EdgeA[a][b]*EdgeA[a][b] < 0.000001 /* R^2 < 0.000001 */ )
         return false;
@@ -979,7 +873,7 @@ bool PN_W_comp( PN_W a, PN_W b)//Used in sort(),which is STL func.
 }
 
 
-double Overlap( int p //p:要考慮放到shortlist的號碼
+double CIRCUIT::Overlap( int p //p:要考慮放到shortlist的號碼
 //計算FF頭尾重疊率 => 取最大值=> 如何比較僅有頭/尾的? => 比較難成功 直接加一個值
 //Used in ChooseVertexWithGreedyMDS()
 //盡量起點端clk path放增加delay的DCC，終點端clk path放減少老化delay的DCC
@@ -987,17 +881,17 @@ double Overlap( int p //p:要考慮放到shortlist的號碼
 )
 {
     double max = 0              ;
-    PATH* pptr = PathC[p]       ;
+    PATH* pptr =  getPathCand().at(p)  ;
     GATE* stptr = pptr->Gate(0) ;//pptr->gate_list[0],where Path::vector<Gate*> gate_list ;
     GATE* edptr = pptr->Gate(pptr->length() - 1);
     
     
-    for( int i = 0; i < PathC.size(); i++ )
+    for( int i = 0; i < getPathCand().size(); i++ )
     {
         //----------------Only Consider Pathes in shortlist-------------------------------------//
-        if(!PathC[i]->Is_Chosen() || !PathC[i]->CheckAttack() ){   continue ;    }
+        if(!getPathCand().at(i)->Is_Chosen() || !getPathCand().at(i)->CheckAttack() ){   continue ;    }
         
-        PATH* iptr = PathC[i] ;//shortlist path
+        PATH* iptr = getPathCand().at(i) ;//shortlist path
         double score    ;
         double s1       ;//Path[p]的FF(head/left)之clkpath跟SlstPath[i]的FF(end/right)之clkpath間的重疊率
         double s2       ;//Path[p]的FF(end/right)之clkpath跟SlstPath[i]的FF(head/left)之clkpath間的重疊率
@@ -1062,191 +956,38 @@ double AtkPointRate( PATH* pptr )//計算自身的重疊率
     return (double)c * 2 / (double)(stptr->ClockLength() + edptr->ClockLength());
 }
 
-bool ChooseVertexWithGreedyMDS2(double year, bool puthash , HASHTABLE * hashp )//找shortlist, 回傳值true表示為domination set
-{
-    //--------------------- Store Info into Hash ------------------------------------------------------
-    if( puthash )
-    {
-        hashp->PutNowStatus();
-        return true          ;
-    }
-    //--------------------- Var Declare ---------------------------------------------------------------
-    int  No_node = (int)(PathC.size())       ;
-    int  *degree = new int[ PathC.size() ]   ;
-    int  *color  = new int[ PathC.size() ]   ;
-    int  cc = 0                              ;//shortlist size
-    
-    //---------------------Graph Init ( color,degree of each node )-------------------------------------
-    for( int i = 0; i < PathC.size() ; i++ )
-    {
-        //color value:-1(black),0(gray),1(white),
-        PathC[i]->SetChoose(false) ;//初始化，全部皆非“shortlist”
-        degree[i] = 0 ;
-        if( !PathC[i]->GetCand() )//if( !PathC[i]->CheckAttack() )
-        {
-            color[i] = -1 ;
-            continue      ;
-        }
-        color[i] = 1 ;//遇到candidate，設定為白點
-        for( int j = 0; j < PathC.size(); j++)//算白點的degree
-        {
-            if( Check_Connect( i, j, year) && i != j && PathC[j]->CheckAttack() )
-            {   degree[i]++ ; }
-        }
-    }
-    
-    int mini    ;
-    int w_point ;//white point #
-    vector< PN_W > cand ;//PN:path number,W weight.PN_W is a struct.
-    while( true )//No break while loop..
-    {
-        //--------------------- 算白點(candidate)數量 -------------------------------------------
-        for( mini = 0, w_point = 0; mini < PathC.size(); mini++)
-        {
-            if ( color[mini] == 1 )
-                w_point++;
-        }
-        if( w_point == 0 )//所有的點已經被支配(or支配別點)
-        {
-            printf("Shortlist size: %d \n",cc);//離開前顯示shortlist size
-            return true;
-        }
-        cand.clear();
-        
-        //---------------------- Make vector<PN_W> cand(標靶)-----------------------------------
-        for( int i = 0; i < PathC.size() ; i++ )
-        {
-            if( color[i] == -1 )				 //黑的不選(ex:mine or 已被選的支配點 )
-            {   continue;  }
-            if( color[i] == 0 && degree[i] == 0 )//沒有degree的灰點不要選
-            {   continue ; }
-            
-            //--------------------- Examinate Repetition --------------------------------------
-            PathC[i]->SetChoose(true) ;//若此點家進shortlist後，使得shortlist跟之前while loop所選的shortlist組合重複
-                                       //或者跟前幾次執行ChooseVertexWithGreedyMDS()的結果重複
-            if( hashp->Exist() )//This condition has repeated !
-            {
-                PathC[i]->SetChoose(false);//在此尚未真正選點，只是藉由Exist()做初步判斷，此點是否可加入shortlist
-                continue ;//若此點已被選過，就沒必要算此點的權重
-            }
-            PathC[i]->SetChoose(false) ;
-            
-            double w = 0 ;//weight
-            w += (double)degree[i]/(double)w_point  ;//加入i點後可減少的白點之比=i點degree/白點數目
-            w -= 1*Overlap(i)                       ;//減掉此i點跟其它shortlist點的重疊率
-            w -= 2*AtkPointRate(PathC[i])           ;//減掉自身的重疊率
-            cand.push_back( PN_W( i, w ) )          ;
-        }
-        if( cand.size() == 0 )//找不到dominate set
-        {
-            return false;
-        }
-        
-        //---------------------- 把能選的點(標靶)，按照分數，大->小排列 --------------------------------
-        sort( cand.begin(), cand.end(), PN_W_comp );
-        
-        //--------------------- 射飛鏢(分:第一次/其他次) --------------------------------------------
-        if( cc == 0 )//shortlist size = 0 時，射飛鏢第一個飛鏢
-        {
-            int s = 0 ;
-            for( int i = 0; i < cand.size(); i++ )
-            {
-                s += degree[cand[i].pn];//所有標靶的面積和，此面積只由degree大小定義//modified c += cand[i].w ;
-            }
-            int target;
-            if( s > 0 )
-                target = rand() % s ;//只有一個點時會出現 s = 0
-            else
-                target = 0;
-            
-            s = 0 ;
-            for( int i = 0; i < cand.size(); i++)//計算飛鏢落在哪個標靶裡面
-            {
-                s += degree[cand[i].pn] ;
-                if( s >= target )
-                {
-                    mini = cand[i].pn ;//此時mini是被飛鏢射中那個點(path)的id
-                    break;
-                }
-            }
-        }
-        else
-        {   //第二個點之後
-            int ed = 0 ;//右界的味道											//找degree最大者,如果相同就隨機
-            while( ed < cand.size() )
-            {
-                if( absl(cand[ed].w - cand[0].w) < 0.5 )//0.5數值可變，tune出來的
-                    ed++;
-                else
-                    break;
-            }
-            mini = cand[rand() % ed].pn;
-        }
-        
-        //-----------------------每選一個點後(每射完飛鏢)後，更新所有點的degree--------------*/
-        for( int i = 0; i < No_node; i++ )
-        {
-            if( mini == i || color[i] == -1 /*黑的:先前已選過orMine*/)	 continue ;
-            
-            if( Check_Connect( mini, i, year) && color[i] == 1 /*射中的標靶，其旁邊有白點*/ )
-            {
-                for (int j = 0; j < No_node; j++)
-                {
-                    if( i == j )	continue;
-                    if( Check_Connect(j,i,year) && color[j] != -1 /*射中的標靶，其旁邊的白點若附近有非黑點*/ )
-                    {   //白->灰,附近的點之degree -1 (黑點已設為degree = 0 跳過)
-                        degree[j]--;
-                    }
-                }
-                color[i] = 0;	//被選點的鄰居，從白點改為灰點
-            }
-            if( Check_Connect(i,mini,year) && color[mini] == 1 /*白的*/)
-            {
-                degree[i] --;
-            }
-        }
-        
-        //-----------------------到此才真正的選點----------------------------------------*/
-        PathC[mini]->SetChoose(true);//設為true代表此點被選中，加到shortlist裡面。
-        degree[mini] = 0  ; //被選點的degree拔掉
-        color[mini] = -1  ;	//被選點改為黑
-        cc++;
-        cout << PathC[mini]->No() << ' ' ;
-        //只算白點的degree
-    }//while(true)
-}
 
-bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//找shortlist, 回傳值true表示為domination set
+bool CIRCUIT::MDS( bool puthash  )//找shortlist, 回傳值true表示為domination set
 {
     //--------------------- Store Info into Hash ------------------------------------------------------
     if( puthash )
     {
-        hashp->PutNowStatus();
+        this->_pHashTable->PutNowStatus( this );
         return true          ;
     }
 
     printf( YELLOW "[1] [MDS] \n" RESET );
     printf( YELLOW "Shortlist: " RESET );
     //--------------------- Var Declare ---------------------------------------------------------------
-    int  *out_deg = new int[ PathC.size() ]   ;//white neighbors #
-    int  *color   = new int[ PathC.size() ]   ;//black(-1),gray(0),white(1)
-    int  cc       = 0                         ;//shortlist size
+    int  *out_deg = new int[ this->getPathCand().size() ]   ;//white neighbors #
+    int  *color   = new int[ this->getPathCand().size() ]   ;//black(-1),gray(0),white(1)
+    int  cc       = 0                                       ;//shortlist size
     enum color{ black = -1 , gray = 0 , white = 1 };
     
     //--------------------- Graph Init ( color,degree of each node )-----------------------------------
-    for( int i = 0; i < PathC.size() ; i++ )
+    for( int i = 0; i < getPathCand().size() ; i++ )
     {
-        PathC[i]->SetChoose(false) ;//Initialized as “None-shortlist”
+        getPathCand().at(i)->SetChoose(false) ;//Initialized as “None-shortlist”
         out_deg[i] =  0            ;
-        if( !PathC[i]->GetCand() )//if( !PathC[i]->CheckAttack() )
+        if( !this->getPathCand().at(i)->GetCand() )
         {
             color[i] = black ;//Mine(black)
             continue         ;
         }
         color[i] = 1 ;//Candidate(white)
-        for( int j = 0; j < PathC.size(); j++)//Calculate white vertex's outdegree
+        for( int j = 0; j < this->getPathCand().size(); j++)//Calculate white vertex's outdegree
         {
-            if( Check_Connect( i, j, year) && i != j && PathC[j]->GetCand() )
+            if( Check_Connect( i, j, year) && i != j && getPathCand().at(j)->GetCand() )
             {
                 out_deg[i]++ ;
             }
@@ -1262,7 +1003,7 @@ bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//
         //2.target-choosing procedure.
     
         //--------------------- Cal White Vertice # -------------------------------------------
-        for( mini = 0, wh_point = 0; mini < PathC.size(); mini++)
+        for( mini = 0, wh_point = 0; mini < getPathCand().size(); mini++)
         {
             if ( color[mini] == white )
                 wh_point++;
@@ -1276,7 +1017,7 @@ bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//
         cand.clear();
         
         //---------------------- Make vector<PN_W> cand(target)--------------------------------
-        for( int i = 0; i < PathC.size() ; i++ )
+        for( int i = 0; i < getPathCand().size() ; i++ )
         {
             //-------- Don't select mine/0-deg gray vertice -----------------------------------
             if( color[i] == black)
@@ -1285,18 +1026,18 @@ bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//
             {   continue ; }
             
             //--------------------- Examinate Repetition --------------------------------------
-            PathC[i]->SetChoose(true) ;//if the vertice is added into shortlist....
-            if( hashp->Exist() )//...,then this permutation cause repetition against previous selection
+            getPathCand().at(i)->SetChoose(true) ;//if the vertice is added into shortlist....
+            if( this->_pHashTable->Exist( this ) )//...,then this permutation cause repetition against previous selection
             {
-                PathC[i]->SetChoose(false);
+                getPathCand().at(i)->SetChoose(false);
                 continue ;//if repetition occur, try next one.
             }
-            PathC[i]->SetChoose(false) ;
+            getPathCand().at(i)->SetChoose(false) ;
             
             double w = 0 ;//weight
             w += (double)out_deg[i]/(double)wh_point;//加入i點後可減少的白點之比=i點degree/白點數目
             w -= 1*Overlap(i)                       ;//減掉此i點跟其它shortlist點的重疊率
-            w -= 2*AtkPointRate(PathC[i])           ;//減掉自身的重疊率
+            w -= 2*AtkPointRate(getPathCand().at(i))           ;//減掉自身的重疊率
             cand.push_back( PN_W( i, w ) )          ;
         }
         if( cand.size() == 0 )//找不到dominate set
@@ -1348,7 +1089,7 @@ bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//
         }
         
         //----------------------- After Select a Vertex, Update the Graph -----------------
-        for( int nb = 0; nb < PathC.size() ; nb++ )
+        for( int nb = 0; nb < getPathCand().size() ; nb++ )
         {
             //nb/NB mean "NeighBor".
             if( mini == nb )	        continue ;//self.
@@ -1357,7 +1098,7 @@ bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//
             //------------------- Find White Neighbors of selected vertex -----------------
             if( Check_Connect( mini, nb, year) && color[nb] == white )
             {
-                for( int nbnb = 0; nbnb < PathC.size() ; nbnb++ )
+                for( int nbnb = 0; nbnb < getPathCand().size() ; nbnb++ )
                 {
                     if( nb == nbnb ) continue ;
                     //----------- Find None-black NB of White NBs of selected vertex ------
@@ -1376,18 +1117,18 @@ bool ChooseVertexWithGreedyMDS(double year, bool puthash , HASHTABLE * hashp )//
         }
         
         //-----------------------到此才真正的選點-----------------------------------------------
-        PathC[mini]->SetChoose(true);
+        getPathCand().at(mini)->SetChoose(true);
         out_deg[mini] = 0     ;
         color[mini]   = black ;
         cc++                  ;//shortlist size increase by 1.
-        printf( "%d ",PathC[mini]->No() );
+        printf( "%d ", getPathCand().at(mini)->No() );
     }//while(true)
 }
 
 map< GATE*, int > cbuffer_code  ;//clock buffer
 map< int, GATE* > cbuffer_decode;
 
-int HashAllClockBuffer()//GenerateSAT中一開始就呼叫
+int CIRCUIT::HashAllClockBuffer()//GenerateSAT中一開始就呼叫
 {
     //1.只對Candidate/Mine Path做
     //2.每個clock souce上的buffer都會有對應的key id,且不重複
@@ -1396,14 +1137,14 @@ int HashAllClockBuffer()//GenerateSAT中一開始就呼叫
     cbuffer_code.clear()    ;
     cbuffer_decode.clear()  ;
     int k = 0               ;//buffer num counter
-    for( unsigned i = 0; i < PathR.size() ; i++ )
+    for( unsigned i = 0; i < this->getPathALL().size() ; i++ )
     {
-        if( PathR[i].IsSafe() )
+        if( this->getPathALL()[i].IsSafe() )
         {
             continue ;
         }
         //-------------------Only en/decode buffers on the ClkPath of cand/mine------------------//
-        PATH * pptr  = &PathR[i] ;
+        PATH * pptr  = &this->getPathALL()[i] ;
         GATE * stptr = pptr->Gate(0)                  ;//PI,or FF(head/left)
         GATE * edptr = pptr->Gate(pptr->length() - 1) ;//PO,or FF(end/left)
         
@@ -1436,23 +1177,17 @@ int HashAllClockBuffer()//GenerateSAT中一開始就呼叫
 }
 
 //------------------Classification of Mine/Candidate/Safe Pathes--------------------------------//
-void CheckPathAttackbility( )
+void CIRCUIT::PathClassify( )
 {
     printf( CYAN"[Info] Classify paths into Mine/Cand/Safe...\n");
     double OriginalE = ERROR    ;
-    period    = 0.0             ;
-    int right = 0               ;
-    int left  = 0               ;
-    if( Q_mode == 3 )
-    {
-        right = 3               ;
-        left  = 4               ;
-    }
+    this->period    = 0.0       ;
+    
     //---------------------------- Set Period ---------------------------------------------------
     //Set such period such that original LT resides between 7~9 years.
-    for( int i = 0; i < PathR.size(); i++ )
+    for( int i = 0; i < this->getPathALL().size(); i++ )
     {
-        PATH* pptr = &PathR[i];
+        PATH* pptr = &(this->getPathALL().at(i));
         GATE* edptr = pptr->Gate(pptr->length() - 1);
         GATE* stptr = pptr->Gate(0)     ;
         pptr->SetPathID(i)              ;
@@ -1483,18 +1218,19 @@ void CheckPathAttackbility( )
         //-------------------------Period Timing with Aging---------------------------------------
         double Dij =  ( pptr->In_time(pptr->length() - 1) - pptr->Out_time(0) ) ;//沒老化,沒PV
         double pp = ( 1 + AgingRate(WORST, static_cast<double>(year + PLUS)))*( Dij ) + Tcq + (clks - clkt) + pptr->GetST();
-        pp *= tight ;
-        if( pp > period )
+        pp *= this->tight ;
+        if( pp > this->period )
         {
-            period = pp;
+            this->period = pp;
         }
     }
     //------------------------------ Cand/Mine/Ssfe --------------------------------------------
-    period = period + period*tc_mgn ;
-    printf( CYAN"   ==> Path total size : " GREEN"%ld\n" RESET, PathR.size() );
-    for( int i = 0; i < PathR.size(); i++ )
+    //this->period = this->period + this->period*tc_mgn ;
+    printf( CYAN"   ==> Path total size : " GREEN"%ld\n" RESET, this->getPathALL().size() );
+    printf( CYAN"   ==> Clock Period    : " GREEN"%f\n" RESET, this->period );
+    for( int i = 0; i < this->getPathALL().size(); i++ )
     {
-        PATH* pptr = &PathR[i];
+        PATH* pptr = &this->getPathALL().at(i);
         pptr->SetAttack(false);
         pptr->SetSafe(true);
         GATE* stptr = pptr->Gate(0);
@@ -1514,11 +1250,11 @@ void CheckPathAttackbility( )
                     _pd->LGate  = NULL ;
                     _pd->R_Name = edptr->GetClockPath(j)->GetName() ;
                     _pd->RGate  = edptr->GetClockPath(j) ;
-                    if( !Vio_Check(pptr,0,j,DCC_NONE,(AGT)x,year + OriginalE,left,R_Thre,R_Times ) )
+                    if( !Vio_Check(pptr,0,j,DCC_NONE,(AGT)x,year + OriginalE ) )
                     {
                         pptr->SetSafe(false)  ;
                         _pd->posfail = false  ;
-                        if( Vio_Check( pptr,0,j,DCC_NONE,(AGT)x,year-OriginalE,right,L_Thre,L_Times ) )
+                        if( Vio_Check( pptr,0,j,DCC_NONE,(AGT)x,year-OriginalE ) )
                         {
                             pptr->SetAttack(true)      ;
                             pptr->pldcc++              ;
@@ -1544,11 +1280,11 @@ void CheckPathAttackbility( )
                     _pd->LGate  = stptr->GetClockPath(j) ;
                     _pd->R_Name = "PO" ;
                     _pd->RGate  = NULL ;
-                    if( !Vio_Check(pptr,j,0,(AGT)x,DCC_NONE,year+OriginalE,left,R_Thre,R_Times ) )
+                    if( !Vio_Check(pptr,j,0,(AGT)x,DCC_NONE,year+OriginalE) )
                     {
                         pptr->SetSafe(false)   ;
                         _pd->posfail = false   ;
-                        if( Vio_Check(pptr,j,0,(AGT)x,DCC_NONE,year-OriginalE,right,L_Thre,L_Times ) )
+                        if( Vio_Check(pptr,j,0,(AGT)x,DCC_NONE,year-OriginalE ) )
                         {
                             pptr->SetAttack(true)      ;
                             pptr->pldcc++              ;
@@ -1575,11 +1311,11 @@ void CheckPathAttackbility( )
                     _pd->LGate  = stptr->GetClockPath(branch) ;
                     _pd->R_Name = edptr->GetClockPath(branch)->GetName() ;
                     _pd->RGate  = edptr->GetClockPath(branch) ;
-                    if( !Vio_Check(pptr,branch,branch,(AGT)x,(AGT)x,year+OriginalE,left,R_Thre,R_Times ) )
+                    if( !Vio_Check(pptr,branch,branch,(AGT)x,(AGT)x,year+OriginalE ) )
                     {
                         pptr->SetSafe(false)  ;
                         _pd->posfail = false  ;
-                        if( Vio_Check(pptr,branch,branch,(AGT)x,(AGT)x,year-OriginalE,right,L_Thre,L_Times ) )
+                        if( Vio_Check(pptr,branch,branch,(AGT)x,(AGT)x,year-OriginalE ) )
                         {
                             pptr->SetAttack(true)      ;
                             pptr->pldcc++              ;
@@ -1608,11 +1344,11 @@ void CheckPathAttackbility( )
                             _pd->LGate  = stptr->GetClockPath(j) ;
                             _pd->R_Name = edptr->GetClockPath(k)->GetName() ;
                             _pd->RGate  = edptr->GetClockPath(k) ;
-                            if( !Vio_Check( pptr,j,k,(AGT)x,(AGT)y,year+OriginalE,left,R_Thre,R_Times ) )
+                            if( !Vio_Check( pptr,j,k,(AGT)x,(AGT)y,year+OriginalE ) )
                             {
                                 pptr->SetSafe(false)    ;
                                 _pd->posfail = false    ;
-                                if( Vio_Check(pptr,j,k,(AGT)x,(AGT)y,year-OriginalE,right,L_Thre,L_Times ) )
+                                if( Vio_Check(pptr,j,k,(AGT)x,(AGT)y,year-OriginalE ) )
                                 {
                                     pptr->SetAttack(true)      ;
                                     pptr->pldcc++              ;
@@ -1629,16 +1365,16 @@ void CheckPathAttackbility( )
                 }//k
             }//j
         }//if-else
-    }//for( PathR )
+    }//for( this->getPathALL() )
     
     int aa = 0 ;//PI#
     int bb = 0 ;//PO#
     int cc = 0 ;//Cand#+Mine#
     int dd = 0 ;//Mine#
     
-    for( unsigned i = 0 ; i < PathR.size(); i++ )
+    for( unsigned i = 0 ; i < this->getPathALL().size(); i++ )
     {
-        PATH* pptr = &PathR[i]      ;
+        PATH* pptr = &this->getPathALL()[i]      ;
         GATE* stptr = pptr->Gate(0) ;
         GATE* edptr = pptr->Gate(pptr->length() - 1)    ;
         pptr->SetCand(false)        ;
@@ -1650,7 +1386,7 @@ void CheckPathAttackbility( )
             
             else if (edptr->GetType() == "PO")  bb++    ;
             else                                cc++    ;
-            PathC.push_back(pptr)                       ;
+            this->getPathCand().push_back(pptr)                       ;
             if( !(pptr->CheckAttack()) )
             {
                 dd++                ;
@@ -1661,11 +1397,11 @@ void CheckPathAttackbility( )
             }
         }
     }
-    if ( PathC.size() <= 0 )
+    if ( getPathCand().size() <= 0 )
     {
         printf( RED"    ==> [Warning] No Path Can Attack!\n" ) ;
     }
-    if ( !CheckNoVio(year + PLUS) )
+    if ( !CheckNoVio( year + PLUS ) )
     {
         printf( RED"    ==> [Warning] Too Tight Clock Period! \n" ) ;
     }
@@ -1673,30 +1409,30 @@ void CheckPathAttackbility( )
     return;
 }
 
-bool CheckNoVio( double year /* = (year+PLUS) in main.cpp */ )//Called in main.cpp for early checking.
+bool CIRCUIT::CheckNoVio( double LT /* = (year+PLUS) in main.cpp */ )//Called in main.cpp for early checking.
 {
     printf( CYAN"[Info] Checking Violation... \n");
-    for (int i = 0; i < PathR.size(); i++)
+    for (int i = 0; i < this->getPathALL().size(); i++)
     {
-        if ( !Vio_Check( &PathR[i], (long double)year, AgingRate(WORST, year),0,0,0 ) )
+        if ( !Vio_Check( &(this->getPathALL().at(i)), (long double)LT, AgingRate(WORST, year), 0 ) )
         {
-            printf( "   ==> Path %d Violation! \n", i );
-            return false ;
+            printf( "   ==> Path %d Violation! with %f\n", i, LT );
         }
     }
     printf( CYAN"   ==> " GREEN"No Timing Violation!\n" RESET);
     return true;
 }
 
-void GenerateSAT( string filename /*file.cnf*/,double year )
+void CIRCUIT::GenerateSAT( )
 {
     printf( "SAT Encoding ") ;
     chrono::steady_clock::time_point sat_st_time, sat_ed_time ;
     chrono::duration<double> SATTime ;
     
     fstream file ;
-    fstream temp ;
-    file.open( filename.c_str(), ios::out);
+    
+    string outputfile = "./CNF/sat.cnf" ;
+    file.open( outputfile.c_str(), ios::out);
     map< GATE*, bool > exclusive;
     
     sat_st_time = chrono::steady_clock::now();
@@ -1704,19 +1440,19 @@ void GenerateSAT( string filename /*file.cnf*/,double year )
     HashAllClockBuffer() ;//每個clockbuffer之編號為在cbuffer_code內對應的號碼*2+1,*2+2
     
     //----------------CLK_Src上不能放DCC----------------------------------------------------------------//
-    GATE* c_source = Circuit[0].GetGate("ClockSource");
+    GATE* c_source = this->GetGate("ClockSource");
     file << '-' << cbuffer_code[c_source] * 2 + 1 << " 0" << endl;
     file << '-' << cbuffer_code[c_source] * 2 + 2 << " 0" << endl;
     
     //----------------Deal with Candidate/Mine Path----------------------------------------------------//
-    for ( unsigned i = 0; i < PathR.size(); i++)
+    for ( unsigned i = 0; i < getPathALL().size(); i++)
     {
-        if ( PathR[i].IsSafe() )
+        if ( getPathALL().at(i).IsSafe() )
         {
             continue ;
         }
         
-        PATH* pptr = &PathR[i]      ;
+        PATH* pptr =  &(getPathALL().at(i))      ;
         GATE* stptr = pptr->Gate(0) ;
         GATE* edptr = pptr->Gate(pptr->length()-1);
         int stn = 0, edn = 0 ;	//放置點(之後，包括自身都會受影響)
@@ -2088,7 +1824,7 @@ void GenerateSAT( string filename /*file.cnf*/,double year )
     file.close();
 }
 
-void printDCCLocation()
+void CIRCUIT::printDCCLocation()
 {
     
     system("./minisat ./CNF/best.cnf ./CNF/temp.sat 1> ./sat_report/minisat_std_output.txt 2> ./sat_report/minisat_warn_output.txt ");
@@ -2127,17 +1863,17 @@ void printDCCLocation()
     }
     printf( CYAN"------------------------------------------------------------\n" RESET);
 }
-int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
+int CIRCUIT::CallSatAndReadReport( int flag /*一般解or最佳解*/ )
 {
     printf( "SAT Decoding ");
     chrono::steady_clock::time_point st_time, ed_time ;
     chrono::duration<double> callsattime ;
     st_time   = chrono::steady_clock::now( ) ;
     //----------- Init [Don't Put DCC]-----------------------------------------
-    for (int i = 0; i < PathR.size(); i++)
+    for (int i = 0; i < this->getPathALL().size(); i++)
     {
-        GATE* stptr = PathR[i].Gate(0);
-        GATE* edptr = PathR[i].Gate(PathR[i].length() - 1) ;
+        GATE* stptr = this->getPathALL().at(i).Gate(0);
+        GATE* edptr = this->getPathALL().at(i).Gate( this->getPathALL().at(i).length() - 1 ) ;
         //------------ Left CLK Path Init--------------------------------------
         for( int j = 0; j < stptr->ClockLength(); j++ )
             stptr->GetClockPath(j)->SetDcc(DCC_NONE);
@@ -2196,18 +1932,18 @@ int CallSatAndReadReport( int flag /*一般解or最佳解*/ )
     return cdcc;
 }
 
-void CheckOriLifeTime()
+void CIRCUIT::CheckOriLifeTime()
 {							//有可能決定Tc的path不在candidate中(mine裡)
     printf( CYAN"[Info] Check Original Lifetime...\n" );		//為何會有>10? 較後面的Path slack大很多(自身lifetime長) 且和前面cp的關連低(前端老化不足)
     double up = 10.0, low = 0.0;					//為何會有接近7? 1.Path之間的slack都接近=>不管老化哪個都不會太差 2.path之間相關度都高
 
-    for (int i = 0; i < PathC.size(); i++)          //不同candidate會造成此處不同... 取聯集
+    for (int i = 0; i < getPathCand().size(); i++)          //不同candidate會造成此處不同... 取聯集
     {
-        if (!PathC[i]->CheckAttack())
+        if (!getPathCand().at(i)->CheckAttack())
             continue;
         double e_upper = 10000, e_lower = 10000;
-        //PathC[i] --> Path[j]
-        for( int j = 0; j < PathC.size(); j++ )
+        //getPathCand().at(i) --> Path[j]
+        for( int j = 0; j < getPathCand().size(); j++ )
         {
             
             if( EdgeA[i][j] > 9999 )
@@ -2226,7 +1962,7 @@ void CheckOriLifeTime()
                     Aging_P = AgingRate(BEST, mid);
                 else
                     Aging_P = upper;
-                if (Vio_Check(PathC[j], (long double)mid, Aging_P,0,0,0))
+                if (Vio_Check(getPathCand().at(j), (long double)mid, Aging_P,0))
                     st = mid;
                 else
                     ed = mid;
@@ -2247,7 +1983,7 @@ void CheckOriLifeTime()
                     Aging_P = AgingRate(BEST, mid);
                 else
                     Aging_P = lower;
-                if (Vio_Check(PathC[j], (long double)mid, Aging_P,0,0,0))
+                if (Vio_Check(getPathCand().at(j), (long double)mid, Aging_P,0))
                     st = mid;
                 else
                     ed = mid;
@@ -2265,7 +2001,7 @@ void CheckOriLifeTime()
 }
 
 
-double CalQuality( double &up, double &low , int mode )
+double CIRCUIT::CalQuality( double &up, double &low , int mode )
 {
     printf("Calculate LT ");
     chrono::steady_clock::time_point q_st_time, q_ed_time ;
@@ -2273,12 +2009,12 @@ double CalQuality( double &up, double &low , int mode )
     q_st_time = chrono::steady_clock::now();
     
     up = 10.0 ; low = 0.0 ;
-    for( int i = 0; i < PathC.size(); i++ )
+    for( int i = 0; i < getPathCand().size(); i++ )
     {
-        if( !PathC[i]->CheckAttack() )  continue ;
+        if( !getPathCand().at(i)->CheckAttack() )  continue ;
     
         double e_upper = 10000, e_lower = 10000 ;
-        for (int j = 0; j < PathC.size(); j++)
+        for (int j = 0; j < getPathCand().size(); j++)
         {
             if( EdgeA[i][j] > 9999 )   continue;
             double st = 0.0 , ed = 10.0, mid = 0 ;
@@ -2293,7 +2029,7 @@ double CalQuality( double &up, double &low , int mode )
                 else
                     Aging_P = upper;
                 
-                if( Vio_Check(PathC[j], (long double)mid, Aging_P, mode, Qal_Thre, Qal_Times ) )
+                if( Vio_Check(getPathCand().at(j), (long double)mid, Aging_P,0) )
                 {
                     st = mid ;//可存活
                 }
@@ -2317,7 +2053,7 @@ double CalQuality( double &up, double &low , int mode )
                     Aging_P = AgingRate(WORST, mid );
                 else
                     Aging_P = lower;
-                if( Vio_Check(PathC[j], (long double)mid, Aging_P, mode,Qal_Thre, Qal_Times ))
+                if( Vio_Check(getPathCand().at(j), (long double)mid, Aging_P,0))
                     st = mid;
                 else
                     ed = mid;
@@ -2345,7 +2081,7 @@ double CalQuality( double &up, double &low , int mode )
     cout << "(" << CYAN << qtime.count() << RESET << "s)"<<endl ;
     return 0.0 ;
 }
-double CalPathAginRateWithPV( PATH * pptr, double year )
+double CIRCUIT::CalPathAginRateWithPV( PATH * pptr, double year )
 {
     double Dij    = pptr->GetFreshDij() ;
     double Dij_pv = Dij ;
@@ -2382,17 +2118,17 @@ bool CheckImpact( PATH* pptr )//此path的頭尾FFs，這兩個FF的clock path�
     return false;
 }
 
-void RemoveRDCCs()
+void CIRCUIT::RemoveRDCCs()
 {
     map< GATE*, bool > must;
     printf( YELLOW "---------------------------------------------\n" RESET );
     printf( YELLOW"[2] [Remove Spare DCCs]\n" RESET )      ;
     //--------Mark DCC positions that is on Shortlist paths' clk path---------------------
-    for ( int i = 0; i < PathC.size(); i++ )
+    for ( int i = 0; i < getPathCand().size(); i++ )
     {
-        if ( !PathC[i]->Is_Chosen() )//若此pah非在shortlist中，則不做
+        if ( !getPathCand().at(i)->Is_Chosen() )//若此pah非在shortlist中，則不做
             continue ;
-        PATH* pptr = PathC[i] ;
+        PATH* pptr = getPathCand().at(i) ;
         GATE* stptr = pptr->Gate(0) ;//FF(head)
         GATE* edptr = pptr->Gate( pptr->length() - 1 ) ;//FF(end)
         
@@ -2413,11 +2149,11 @@ void RemoveRDCCs()
     file.open( "./CNF/sat.cnf", ios::out | ios::app ) ;
     
     //-----Find additional DCC placement that is not on shortlist paths' clk path-----------//
-    for( int i = 0; i < PathR.size(); i++)//unsafe的點有可能被放無關緊要的DCC(只要不會過早)
+    for( int i = 0; i < this->getPathALL().size(); i++)//unsafe的點有可能被放無關緊要的DCC(只要不會過早)
     {
-        if( PathR[i].Is_Chosen() || PathR[i].IsSafe() ) continue ;
+        if( this->getPathALL()[i].Is_Chosen() || this->getPathALL()[i].IsSafe() ) continue ;
         
-        PATH* pptr = &PathR[i];
+        PATH* pptr = &this->getPathALL()[i];
         GATE* stptr = pptr->Gate(0);
         GATE* edptr = pptr->Gate(pptr->length() - 1);
         bool flag = true;
@@ -2461,141 +2197,7 @@ void RemoveRDCCs()
     }
     file.close();
 }
-int RefineResult(double year , bool flag /* Print or not */ )
-{
-    int catk  = 0       ;//# of path whose lifetime is within n + e years.
-    int cimp  = 0       ;//# of path whose clk path is placed DCC.
-    int mode3 = 0       ;
-    int mode4 = 0       ;
-    if( Q_mode == 3 )
-    {
-        mode3  = 3      ;
-        mode4  = 4      ;
-    }
 
-    if( flag )
-    {
-        printf("\n[ " YELLOW "Shortlist" RED" Mine" BLUE" Candidate " CYAN " Safe " RESET " ]\n" );
-        for( int i = 0; i < PathR.size(); i++ )
-        {
-            PATH* pptr = &PathR[i]  ;
-            bool safe = true        ;
-            bool prefail = false    ;
-            bool inrange = false    ;
-            bool putdcc = false     ;
-            double st = 0.0, ed = 10, mid = 0.0     ;
-            
-            //------------------ Put DCC -----------------------------------------
-            if( CheckImpact( pptr ) )
-            {
-                cimp++ ;
-                putdcc = true ;
-            }
-            //------------------ LT < n + e -------------------------------------------
-            if( !Vio_Check(pptr,(double)year + ERROR,AgingRate(WORST,year + ERROR),mode4,Ref_Thre,Ref_Times ) )
-            {
-                catk++          ;
-                safe = false    ;
-            }
-            //------------------ LT < n - e --------------------------------------------
-            if( !Vio_Check(pptr,(double)year-ERROR,AgingRate(WORST,year-ERROR),mode4,Ref_Thre,Ref_Times) )
-            {
-                prefail = true ;
-                if( pptr->CheckAttack( ) )   {  printf(RED) ;   }//Candidate Prefail
-                while( ed - st > 0.0001 )
-                {
-                    mid = (st + ed) / 2 ;
-                    if( Vio_Check( &PathR[i],mid,AgingRate(WORST, mid),mode3,Ref_Thre,Ref_Times ) )
-                    {   st = mid    ;   }
-                    else
-                    {   ed = mid    ;   }
-                }
-            }
-            //------------------ n - e < LT < n + e -------------------------------------
-            if( !safe && !prefail )
-            {   inrange = true ;    }
-            //------------------ Print --------------------------------------------------
-            if( pptr->Is_Chosen() )                     printf(YELLOW) ;
-            if( pptr->GetMine() )                       printf(RED)    ;
-            if( !pptr->Is_Chosen() && pptr->GetCand() ) printf(BLUE)   ;
-            if( pptr->IsSafe() )                        printf(CYAN)   ;
-            if( putdcc && !safe ) printf( "[DCC] ") ;
-            if( !safe ) printf("Path[%d] : %s ~ %s \n",i,pptr->Gate(0)->GetName().c_str(),pptr->Gate(pptr->length()-1)->GetName().c_str() );
-            if( prefail )
-                printf("--Its LT = %f < %f (desired year) \n",mid, year-ERROR ) ;
-            if( inrange )
-                printf("--Its LT is between n - e ~ n + e \n" ) ;
-            printf(RESET) ;
-        }//for(PathR)
-        printf( RESET "Attacked Path(monte)# : %d ( LT < n + e )\n" , catk )   ;
-        printf( RESET "Impacted Path(monte)# : %d ( Placed DCC )\n" , cimp )   ;
-        return -1 ;
-    }//if(flag)
-    
-    double maxe = 0  ;//最差path的Quality
-    int maxep = -1   ;//最差path的編號
-    
-    for( int i = 0; i < PathC.size(); i++ )//找"從哪個i點推出去的範圍最爛",將i加入
-    {
-        if( PathC[i]->IsTried() || !PathC[i]->CheckAttack() ){  continue ; }
-        double e_upper = 10000, e_lower = 10000;
-        for( int j = 0; j < PathC.size(); j++ )
-        {
-            if( EdgeA[i][j] > 9999 )        {   continue ;  }
-            if( !PathC[i]->CheckAttack() )  {   continue ;  }
-            double st = 0.0, ed = 10.0, mid = 0 ;
-            //--------------Upper-------------------------------------------
-            while( ed - st > 0.0001 )
-            {
-                mid = (st + ed) / 2;
-                double upper, lower;
-                CalPreInv( AgingRate(WORST, mid), upper, lower, i, j, mid ) ;
-                double Aging_P;
-                if( upper > AgingRate(WORST, mid) )
-                {   Aging_P = AgingRate(WORST, mid) ;   }
-                else
-                {   Aging_P = upper ;    }
-                if( Vio_Check( PathC[j],(long double)mid,Aging_P,mode3,Ref_Thre,Ref_Times ) )
-                    st = mid;
-                else
-                    ed = mid;
-            }
-            if( mid < e_upper )
-            {   e_upper = mid ; }
-            
-            //--------------Lower-------------------------------------------
-            st = 0.0, ed = 10.0, mid = 0  ;
-            while( ed - st > 0.0001 )
-            {
-                mid = (st + ed) / 2;
-                double upper, lower;
-                CalPreInv(AgingRate(WORST, mid), upper, lower, i, j, mid);
-                double Aging_P;
-                if( lower > AgingRate(WORST, mid) )
-                {   Aging_P = AgingRate(WORST, mid) ; }
-                else
-                {   Aging_P = lower ;   }
-                if( Vio_Check(PathC[j],(long double)mid,Aging_P,mode3,Ref_Thre,Ref_Times ) )
-                    st = mid;
-                else
-                    ed = mid;
-            }
-            if( mid < e_lower)
-            {   e_lower = mid ; }
-        }//for(Path[j])
-        if( absl(e_upper - year) > maxe )
-        {
-            maxe = absl(e_upper - year);
-            maxep = i;
-        }
-        if( absl(e_lower - year) > maxe )
-        {
-            maxe = absl(e_lower - year);
-            maxep = i;
-        }
-    }
-    return maxep ;
-}
 
 bool AnotherSol()//將結果反向
 {
@@ -2629,14 +2231,14 @@ bool AnotherSol()//將結果反向
     solution.close();
     return true;
 }
-unsigned HASHTABLE::CalKey()
+unsigned HASHTABLE::CalKey( CIRCUIT *circuit )
 {
     unsigned key = 0x0  ;//32-bit
     unsigned temp = 0x0 ;//32-bit
-    for( int i = 0; i < PathC.size(); i++ )
+    for( int i = 0; i < circuit->getPathCand().size(); i++ )
     {
         temp <<= 1;
-        if( PathC[i]->Is_Chosen() )
+        if( circuit->getPathCand().at(i)->Is_Chosen() )
             temp++;
         if( (i+1)%size == 0 )
         {
@@ -2647,23 +2249,23 @@ unsigned HASHTABLE::CalKey()
     key ^= temp;//XOR
     return key;
 }
-bool HASHTABLE::Exist()
+bool HASHTABLE::Exist( CIRCUIT *circuit )
 {
-    unsigned key = CalKey();
+    unsigned key = CalKey( circuit );
     if( !exist[key] ){  return false ; }
     
-    for( int i = 0; i < PathC.size(); i++)//可能有不同的狀態對應到同一種key，所以要一一比對
+    for( int i = 0; i < circuit->getPathCand().size(); i++)//可能有不同的狀態對應到同一種key，所以要一一比對
     {
-        if( PathC[i]->Is_Chosen() != choose[key][i] ){  return false ;  }
+        if( circuit->getPathCand().at(i)->Is_Chosen() != choose[key][i] ){  return false ;  }
     }
     return true;
 }
-void HASHTABLE::PutNowStatus()
+void HASHTABLE::PutNowStatus( CIRCUIT *circuit )
 {
-    unsigned key = CalKey();
+    unsigned key = CalKey( circuit );
     exist[key] = true;
-    for( int i = 0; i < PathC.size(); i++ )
+    for( int i = 0; i < circuit->getPathCand().size(); i++ )
     {
-        choose[key][i] = PathC[i]->Is_Chosen() ;//若重複就覆蓋
+        choose[key][i] = circuit->getPathCand().at(i)->Is_Chosen() ;//若重複就覆蓋
     }
 }
