@@ -8,6 +8,7 @@
 #define MAGENTA "\x1b[35m"
 #define CYAN    "\x1b[36m"
 #define RESET   "\x1b[0m"
+#define GRN     "\x1b[32m"
 #define LName  pptr.Gate(0)->GetName().c_str()
 #define RName  pptr.Gate(pptr.length()-1)->GetName().c_str()
 #define LNameI pptri->Gate(0)->GetName().c_str()
@@ -200,7 +201,6 @@ bool CIRCUIT::ReadParameter( int argc, char* argv[], string &message )
             else if (line.find("fixed")!=string::npos)
             {
                 double f = atof(line.c_str() + 10)  ;
-                cout << "f " << f << endl ;
                 PLUS = f - year                     ;
             }
             else{   PLUS = atof(line.c_str() + 4)   ;   }
@@ -264,15 +264,11 @@ void Region( double &year_lower, double &year_upper, double &L, double &R )
 //              PV Simulator                                                      //
 ////////////////////////////////////////////////////////////////////////////////////
 
-//bool compare( struct PVdata* A, struct PVdata*B ){  return ( A->gdist() < B->gdist() ) ; }
 
 void CIRCUIT::PV_Monte_Simulation(  )
 {
-    vector< struct PVdata* > _vPV           ;
-    FILE *foutput = fopen("./quality/LT.txt","w+t") ;
-    
     double PV_monteU = 0, PV_monteL = 0 ;
-    //double L = year-ERROR, R = year+ERROR ;
+    
     chrono::steady_clock::time_point starttime, endtime, pre_time, ed_time ;
     chrono::duration<double>  PVSeedTime, TotalPVSeedTime ;
     pre_time = chrono::steady_clock::now();
@@ -296,14 +292,15 @@ void CIRCUIT::PV_Monte_Simulation(  )
         printf( RESET );
         cout << "PV Seed Time = " << CYAN << PVSeedTime.count() << RESET<< endl  ;
         
-        //Region( PV_monteU, PV_monteL, L, R ) ;
-        fprintf( foutput, "%f %f\n", PV_monteL, PV_monteU )          ;
+        this->getInstLT().push_back( pair<double,double>(PV_monteL,PV_monteU) );
+        
     }
     ed_time = chrono::steady_clock::now();
     TotalPVSeedTime = chrono::duration_cast<chrono::duration<double>>(ed_time - pre_time) ;
     printf( CYAN"-------------- PV Summary------------------------------------\n") ;
-    cout << CYAN << "Total Seed #    = " << GRN << PVtimes << RESET << endl ;
-    cout << CYAN << "Total Seed Time = " << GRN << TotalPVSeedTime.count() << RESET << endl ;
+    cout << CYAN << "[Setting] Total Seed #    = " << GRN << PVtimes << RESET << endl ;
+    cout << CYAN << "[Results] Total Seed Time = " << GRN << TotalPVSeedTime.count() << RESET << endl ;
+    this->InstanceProab() ;
 }
 ////////////////////////////////////////////////////////////////////////////////////
 //              PV Simulator - Instance Generator                                 //
@@ -312,11 +309,6 @@ void CIRCUIT::GeneratePVCkt()
 {
     for( int i = 0 ; i < this->getPathALL().size() ; i++ )
     {
-        /*
-        PathR[i].SetPVMine(false) ;
-        PathR[i].SetPVCand(false) ;
-        PathR[i].SetPVSafe(true)  ;
-         */
         for( int j = 1 ; j < this->getPathALL().at(i).gTiming()->size() ; j++ )
         {
             double U = rand() / (double)RAND_MAX                    ;
@@ -333,7 +325,7 @@ double CIRCUIT::Monte_PVCalQuality( double &low, double &up )
 {
     up = 10.0; low = 0.0            ;
     int TryT = 3000 / getPathCand().size()  ;
-    if( TryT < 30 ) TryT = 30       ;
+    if( TryT < 20 ) TryT = 20       ;
     
     vector< double> monte           ;
     monte.clear( )                  ;
@@ -360,6 +352,9 @@ double CIRCUIT::Monte_PVCalQuality( double &low, double &up )
             lt = 10000  ;
             AgR_AtoB = 0;
             pptr = NULL ;
+            U = rand() / (double)RAND_MAX;
+            V = rand() / (double)RAND_MAX;
+            Z = sqrt(-2 * log(U))*cos(2 * 3.14159265354*V) ;
         
             for( int j = 0; j < getPathCand().size(); j++ )//Path B
             {
@@ -367,12 +362,9 @@ double CIRCUIT::Monte_PVCalQuality( double &low, double &up )
                 st  = 1  ;
                 ed  = 10 ;
                 mid = 0  ;
-                U = rand() / (double)RAND_MAX;
-                V = rand() / (double)RAND_MAX;
-                Z = sqrt(-2 * log(U))*cos(2 * 3.14159265354*V) ;
     
                 //#####-------Binary Search---------------------------------------------
-                while( ed - st > 0.001 )
+                while( ed - st > 0.01 )
                 {
                     mid = (st + ed) / 2;
                     AgR_A_Wst_mid = CalPathAginRateWithPV( getPathCand().at(i), mid ) ;//Paht A worst-case aging rate

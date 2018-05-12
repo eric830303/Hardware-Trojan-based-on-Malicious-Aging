@@ -3,6 +3,7 @@
 
 #define RED     "\x1b[31m"
 #define GREEN   "\x1b[32m"
+#define GRN     "\x1b[32m"
 #define YELLOW  "\x1b[33m"
 #define BLUE    "\x1b[34m"
 #define MAGENTA "\x1b[35m"
@@ -2268,4 +2269,75 @@ void HASHTABLE::PutNowStatus( CIRCUIT *circuit )
     {
         choose[key][i] = circuit->getPathCand().at(i)->Is_Chosen() ;//若重複就覆蓋
     }
+}
+
+
+
+
+
+double CDF( double x, double m, double s )
+{
+    
+    //double cdf = 0.5*( 1 + erf( (year - avg)/(sd*sqrt(2)) ) );
+    double cdf = 0.5 * erfc(-(x-m)/(s*sqrt(2))) ;
+    return cdf ;
+}
+void CIRCUIT::InstanceProab( )
+{
+    double UB = 0, LB = 0 ;
+    if( this->year == 3 ){ LB = 1 ; UB = 5 ; }
+    if( this->year == 4 ){ LB = 2 ; UB = 6 ; }
+    if( this->year == 5 ){ LB = 3 ; UB = 7 ; }
+    double range= ( UB - LB )/(100)        ;
+    
+    
+    int    *vctrL= new int [ 100 ]         ;
+    int    *vctrU= new int [ 100 ]         ;
+    double *vprob= new double [ PVtimes ]  ;
+    
+    
+    //---- Initialization ----------------------------
+    for( int i = 0 ; i < 100 ; i++ ){ vctrL[i] = vctrU[i] = 0 ; }
+    
+    int index = 0 ;
+    for( int i = 0 ; i < this->getInstLT().size() ; i++  )
+    {
+        index = (this->getInstLT().at(i).first  - LB)/range ;
+        vctrL[index] =vctrL[index] + 1 ;
+        index = (this->getInstLT().at(i).second - LB)/range ;
+        vctrU[index] =vctrU[index] + 1 ;
+    }
+    
+    double avg_prob = 0 ;
+    double mean = (UB+LB)/2 ;
+    
+    for( int i = 0 ; i < this->getInstLT().size() ; i++  )
+    {
+        double avg_ins = ( getInstLT().at(i).second + getInstLT().at(i).first )/2 ;
+        double sd_ins  = ( getInstLT().at(i).second - getInstLT().at(i).first )*0.95/6;
+        double cdf1 =  CDF( mean*1.1, avg_ins, sd_ins ) ;
+        double cdf2 =  CDF( mean*0.9, avg_ins, sd_ins ) ;
+        vprob[i] = cdf1 - cdf2 ;
+        avg_prob += vprob[i] ;
+    }
+    //---- Output File -----------------------------------
+    string file_dist_name = "./quality/" + this->filename + "_" + to_string( (int)(this->year) ) + "_" + to_string( (int)(this->PVRange*1000) ) + "mV_dist.txt " ;
+    string file_inst_name = "./quality/" + this->filename + "_" + to_string( (int)(this->year) ) + "_" + to_string( (int)(this->PVRange*1000) ) + "mV_inst.txt " ;
+    FILE *foutput1 = fopen( file_dist_name.c_str(), "w+t");
+    FILE *foutput2 = fopen( file_inst_name.c_str(), "w+t");
+    for( int i = 0 ; i < 100 ; i++ )
+    {
+        fprintf( foutput1, "%f \t %d %d\n", LB + i*range, vctrL[i], vctrU[i] );
+    }
+    for( int i = 0 ; i < getInstLT().size()  ; i++ )
+    {
+        fprintf( foutput2, "Instance(%d): \t %f %f %f \n", i, getInstLT().at(i).first, getInstLT().at(i).second, vprob[i] );
+    }
+    //---- Output Screen -----------------------------------
+    avg_prob /= ( getInstLT().size() ) ;
+    cout << CYAN << "[Setting] granularity     = " << GRN << range         << " year" << RESET << endl ;
+    cout << CYAN << "[Setting] Mean            = " << GRN << mean          << " year" << RESET << endl ;
+    cout << CYAN << "[Result]  Arithmetic Avg. = " << GRN << avg_prob*100  << "\%"   << RESET << endl ;
+    
+    
 }

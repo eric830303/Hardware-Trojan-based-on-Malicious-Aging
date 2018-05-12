@@ -13,7 +13,6 @@ INC	:= $(wildcard $(SRCDIR)/*.h)
 OBJ	:= $(SRC:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 EXE	:= research
 OS      := $(shell uname)
-Chk_Sv	:= $(shell test -e "Vth_pv_Sv.txt" && echo "Y" || echo "N" )
 Chk_mi	:= $(shell test -d "MINISATS" && echo "Y" || echo "N" )
 Chk_bk	:= $(shell test -d "benchmark" && echo "Y" || echo "N" )
 Chk_qy	:= $(shell test -d "quality" && echo "Y" || echo "N" )
@@ -32,12 +31,6 @@ info:
 	@printf "\033[32m-----------------------------------\n"
 	@printf "\033[32m Project Name: HTH               \n"
 
-##----------- Check first file ----------------------------
-  ifeq ($(Chk_Sv),N)
-	@printf "\033[31m Check: Vth_pv_Sv.txt --> Not exist !\n"
-  else
-	@printf "\033[32m Check: Vth_pv_Sv.txt --> Exist !\n"
-  endif
 ##----------- Check first file ----------------------------
   ifeq ($(Chk_mi),N)
 	@printf "\033[31m Check: MINISATS(dir) --> Not exist !\n"

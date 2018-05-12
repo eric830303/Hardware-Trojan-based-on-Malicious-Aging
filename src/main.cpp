@@ -123,7 +123,6 @@ int main( int argc, char* argv[] )
     circuit.PV_Monte_Simulation()           ;
     end_time = chrono::steady_clock::now()  ;
     TotalTime = chrono::duration_cast<chrono::duration<double>>( end_time - pre_time );
-    
     //------------- Show Final Results ----------------------------------------------------------
     printf( CYAN"--------------Final Result------------------------------------\n") ;
     circuit.printSetting()                              ;

@@ -158,6 +158,7 @@ private:
     string name                     ;
     vector< GATE* >     gate_list   ;
     vector< WIRE* >     wire_list   ;
+    vector< pair<double, double> > inst_LT;
     map< string, GATE* >nametogate  ;
     map< string, WIRE* >nametowire  ;
     HASHTABLE * _pHashTable         ;
@@ -280,7 +281,8 @@ public:
     void    printDCCLocation();
     void    GenerateSAT( );
     int     CallSatAndReadReport( int );
-    bool BInv(double &bu, double &bl, double u1, double l1, double u2, double l2,double n,int &dcb,int dc1,int dc2);
+    bool    BInv(double &bu, double &bl, double u1, double l1, double u2, double l2,double n,int &dcb,int dc1,int dc2);
+    void    InstanceProab( );
     //----Get/Call --------------------------------------------------
     string  GetName() ;
     int     shortlistsize();
@@ -300,6 +302,7 @@ public:
     vector<PATH>  & getPathALL() { return _vPathAll  ; }
     vector<PATH*> & getPathCand(){ return _vPathCand ; }
     vector<GATE*> & getDCCList() { return _vDCCGate  ; }//Store used DCC
+    vector< pair<double,double> > & getInstLT() { return inst_LT  ; }//Store used DCC
     HASHTABLE * getHashTable( ){ return this->_pHashTable ; }
     void PutClockSource();
     

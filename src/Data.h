@@ -13,37 +13,11 @@
 #include "circuit.h"
 using namespace std ;
 
-class PVdata    ;
-class HASHTABLE ;
 class GATE      ;
-class PATH      ;
-class CIRCUIT   ;
+
 
 inline double maxf(double a, double b) ;
 inline double minf(double a, double b) ;
-
-
-void    release( HASHTABLE *)                                                       ;
-void    PV_show()                                                                   ;
-
-
-//--------------- Quality for Each Instance ----------------------
-struct PVdata
-{
-    double  upper,lower,dist    ;
-    //------------ Constructor -----------------------------------
-    PVdata( double u , double l ):upper(u),lower(l)
-    {  dist = 0 ; }
-    PVdata( ){  upper = lower = dist = 0        ; }
-    //------------ Function --------------------------------------
-    double      gupper()          { return upper; }
-    double      glower()          { return lower; }
-    double      gdist()           { return dist ; }
-    void        supper( double u ){ upper = u   ; }
-    void        slower( double l ){ lower = l   ; }
-    void        sdist( double d ) { dist  = d   ; }
-};
-
 
 
 //--------------- Info for DP --------------------------------------
