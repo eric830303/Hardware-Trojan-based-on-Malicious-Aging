@@ -63,6 +63,7 @@ info:
 clean:
 	$(RM) research $(OBJDIR)/*.o
 	$(RM) CNF/*.cnf
+	$(RM) sat_report/*
 .PHONY:clean
 clean_file:
 	$(RM) *.rpt *.cp *.vg

@@ -11,7 +11,6 @@
 #include <sys/wait.h>
 #include <math.h>
 #include "circuit.h"
-#include "aging.h"
 #include "Data.h"
 
 #define RED     "\x1b[31m"

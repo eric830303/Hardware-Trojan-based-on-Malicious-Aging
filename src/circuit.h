@@ -13,7 +13,6 @@
 #include<map>
 #include<tuple>
 #include"typedef.h"
-#include"aging.h"
 #include"Data.h"
 #include<pthread.h>
 
@@ -31,18 +30,7 @@ class PATH      ;
 /////////////////////////////////////////////////////////////////////////
 //                  Function Forward Declration                        //
 /////////////////////////////////////////////////////////////////////////
-
-void CalVertexWeight( )             ;
-void RemoveRDCCs( )                 ;
-void EstimateTimeEV(double )        ;
-void ReadCpInfo( string )           ;
-void PrintStatus( double )          ;
-
-void DefCandMineSafe( double, double, bool, double )            ;
 double absff( double )                                          ;
-void   CalSv( )                                         ;
-double CalAgingRateWithVthPV( double, double )                  ;
-double CalPathAginRateWithPV( PATH *, double )                  ;
 /////////////////////////////////////////////////////////////////////////
 //                  HashTable                                          //
 /////////////////////////////////////////////////////////////////////////
