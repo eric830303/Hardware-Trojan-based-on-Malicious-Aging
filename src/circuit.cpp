@@ -2286,6 +2286,11 @@ void CIRCUIT::InstanceProab( )
     if( this->year == 3 ){ LB = 1 ; UB = 5 ; }
     if( this->year == 4 ){ LB = 2 ; UB = 6 ; }
     if( this->year == 5 ){ LB = 3 ; UB = 7 ; }
+    else
+    {
+        LB = this->year - 2 ;
+        UB = this->year + 2 ;
+    }
     double range= ( UB - LB )/(100)        ;
     
     
@@ -2331,6 +2336,7 @@ void CIRCUIT::InstanceProab( )
     {
         fprintf( foutput2, "Instance(%d): \t %f %f %f \n", i, getInstLT().at(i).first, getInstLT().at(i).second, vprob[i] );
     }
+    
     //---- Output Screen -----------------------------------
     avg_prob /= ( getInstLT().size() ) ;
     cout << CYAN << "[Setting] granularity     = " << GRN << range         << " year" << RESET << endl ;
