@@ -113,31 +113,19 @@ void CIRCUIT::printSetting(  )
 {
     printf( CYAN "------------------- Setting --------------------------------\n" RESET ) ;
     printf( CYAN "Benchmark  = " GRN "%s\n", filename.c_str() ) ;
-    printf( CYAN "Year  = " GRN "%f\n", year  ) ;
-    printf( CYAN "C.Y.  = " GRN "%f\n", convergent_year  ) ;
-    printf( CYAN "ERROR = " GRN "%f\n", ERROR ) ;
-    printf( CYAN "PLUS  = " GRN "%f\n", PLUS  ) ;
-    printf( CYAN "TIGHT = " GRN "%f\n", tight ) ;
-    printf( CYAN "Tc Margin  = " GRN "%f\n", tc_mgn  ) ;
-    printf( CYAN "A     = " GRN "%f\n", this->A  ) ;
-    printf( CYAN "Alpha = " GRN "%f\n", this->alpha  ) ;
-    printf( CYAN "Exp   = " GRN "%f\n", this->Exp  ) ;
+    printf( CYAN "n         = " GRN "%2.1f yr\n", year  ) ;
+    printf( CYAN "e         = " GRN "%2.1f yr\n", ERROR ) ;
+    printf( CYAN "Arc Thd   = " GRN "%4.3f  \n", arc_thd ) ;
+    printf( CYAN "Arc err   = " GRN "%4.3f  \n", errlimit) ;
+    printf( CYAN "MC C.Y.   = " GRN "%2.1f  yr (Convergent year)\n", convergent_year  ) ;
+    printf( CYAN "MC Vth-pv = " GRN "%5.4f  V  (Sd Variance)\n", PVRange) ;
+    printf( CYAN "PLUS      = " GRN "%f\n", PLUS  ) ;
+    printf( CYAN "TIGHT     = " GRN "%f\n", tight ) ;
+    printf( CYAN "Tc Margin = " GRN "%f\n", tc_mgn  ) ;
+    printf( CYAN "A         = " GRN "%5.4f\n", this->A  ) ;
+    printf( CYAN "Alpha     = " GRN "%3.2f\n", this->alpha  ) ;
+    printf( CYAN "Exp       = " GRN "%3.2f\n", this->Exp  ) ;
     printf( CYAN "Final Refimement times = " GRN "%d \n", FINAL ) ;
-    
-    /*
-    if( Q_mode != 0 )
-    printf( CYAN "PV-Aware Mechanism: " RED "OPEN\n" RESET );
-    else
-    printf( CYAN "PV-Aware Mechanism: " GRN "CLOSE\n" RESET );
-    
-    if( Q_mode != 0 )
-    {
-        printf(  CYAN"Left(-->) |  (<---)Right  \n");
-        printf(  GRN "%d" CYAN"/" GRN"%d     " CYAN"|      " GRN"%d" CYAN"/" GRN"%d \n", L_Thre,L_Times,R_Thre,R_Times );
-    }
-     */
-    printf( CYAN "DiGraph Arc Thd = " RED"%f\n", arc_thd ) ;
-    printf( CYAN "Vth-pv (Std Deviation) = " GRN"%f\n", PVRange) ;
     if( monte_s )
     printf( CYAN "Monte-Carlo LT Estimation" RED " OPEN \n" )  ;
     else
@@ -187,7 +175,8 @@ bool CIRCUIT::ReadParameter( int argc, char* argv[], string &message )
         if( line.find("MDS_Times")              != string::npos )    this->trylimit  = atoi(line.c_str() + 9 )    ;
         if( line.find("Instance_Ctr")           != string::npos )    this->PVtimes   = atoi(line.c_str() + 12 )    ;
         if( line.find("FINAL")                  != string::npos )    this->FINAL     = atof(line.c_str() + 5 )    ;
-        if( line.find("Arc-Thd")                != string::npos )    this->arc_thd   = atof(line.c_str() + 7 )   ;
+        if( line.find("Arc_Thd")                != string::npos )    this->arc_thd   = atof(line.c_str() + 7 )   ;
+        if (line.find("Arc_Err")                != string::npos){    this->errlimit  = atof(line.c_str() + 7);   }
         if( line.find("Attack_yr")              != string::npos )    this->year      = atof(line.c_str() + 9 )   ;
         if( line.find("Error_yr")               != string::npos )    this->ERROR     = atof(line.c_str() + 8 )   ;
         if( line.find("MONTE YES")              != string::npos )    this->monte_s   = true                       ;

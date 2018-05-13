@@ -825,8 +825,6 @@ inline double absl(double x)
     return x;
 }
 
-double thershold = 0.8;	//R平方
-double errlimit = 0.01;	//老化差(改名一下)
 
 void CIRCUIT::AdjustConnect()//讀以上兩個值
 {
@@ -837,11 +835,11 @@ void CIRCUIT::AdjustConnect()//讀以上兩個值
     {
         if (line.find("thershold") != string::npos)
         {
-            thershold = atof(line.c_str() + 9);
+            this->arc_thd = atof(line.c_str() + 9);
         }
         if (line.find("edge error") != string::npos)
         {
-            errlimit = atof(line.c_str() + 10);
+            this->errlimit = atof(line.c_str() + 10);
         }
     }
     ff.close();
@@ -853,7 +851,7 @@ bool CIRCUIT::Check_Connect(int a, int b,double year)
         return false;
     if ( cor[a][b] < 0 )//負相關視為沒連接
         return false;
-    if ( (cor[a][b]*cor[a][b]) /*R^2*/ < thershold )//相關係數要超過thershold才視為有邊
+    if ( (cor[a][b]*cor[a][b]) /*R^2*/ < this->arc_thd )//相關係數要超過thershold才視為有邊//thershold
         return false;
     if ( absl( CalPreAging(AgingRate(WORST, year), a, b, year) - AgingRate(WORST, year)) > errlimit )
         return false;

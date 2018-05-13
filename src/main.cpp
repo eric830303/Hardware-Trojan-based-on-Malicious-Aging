@@ -41,7 +41,7 @@ int main( int argc, char* argv[] )
     circuit.PutClockSource( )       ;
     circuit.ReadTimingReport( )     ;
     circuit.ReadAgingData( )        ;
-    circuit.AdjustConnect( )        ;
+    //circuit.AdjustConnect( )        ;
     //------------ Cand,Mine,Safe -----------------------------------------------------------
     circuit.PathClassify( )        ;
     circuit.ReadCpInfo( )          ;//Read *.cp

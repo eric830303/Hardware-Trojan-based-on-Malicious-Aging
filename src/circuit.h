@@ -200,11 +200,13 @@ private:
     int    reftime = 0      ;
     int    PVtimes = 0      ;
     bool   monte_s = false  ;
+    double errlimit = 0.01;    //老化差(改名一下)
     string filename= ""     ;
     
     
     
 public:
+    
     CIRCUIT()
     {
         bestup   = 100   ;
