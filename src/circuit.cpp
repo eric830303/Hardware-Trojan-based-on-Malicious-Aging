@@ -2336,7 +2336,8 @@ void CIRCUIT::InstanceProab( )
     {
         fprintf( foutput2, "Instance(%d): \t %f %f %f \n", i, getInstLT().at(i).first, getInstLT().at(i).second, vprob[i] );
     }
-    
+    fclose( foutput1 );
+    fclose( foutput2 );
     //---- Output Screen -----------------------------------
     avg_prob /= ( getInstLT().size() ) ;
     cout << CYAN << "[Setting] granularity     = " << GRN << range         << " year" << RESET << endl ;
